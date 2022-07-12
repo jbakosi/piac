@@ -51,12 +51,10 @@ cd piac/build
 ```
 
 ## Contribute
-
 Contact us on [matrix](https://matrix.to/#/@jbakosi:matrix.org).
-
-## License
-
-GPL v3.
 
 ## Pronounce
 [[ˈpijɒt͡s]](https://en.wiktionary.org/wiki/piac)
+
+## License
+GPL v3.
