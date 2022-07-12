@@ -63,40 +63,12 @@ void run_server( const std::string& db_name, int server_port ) {
   socket.bind( "tcp://*:" + std::to_string(server_port) );
   NLOG(INFO) << "Server bound to port " << server_port;
   // listen for messages
-  while(true) {
+  while (not g_interrupted) {
     zmq::message_t request;
     auto res = socket.recv( request, zmq::recv_flags::none );
     NLOG(DEBUG) << "Received message: '" << request.to_string() << "'";
     interpret_query( db_name, socket, request.to_string() );
   }
-}
-
-void crash_handler( int sig ) {
-  // associate each signal with a signal name string.
-  const char* name = nullptr;
-  switch( sig ) {
-    case SIGABRT: name = "SIGABRT";  break;
-    case SIGFPE:  name = "SIGFPE";   break;
-    case SIGILL:  name = "SIGILL";   break;
-    case SIGINT:  name = "SIGINT";   break;
-    case SIGSEGV: name = "SIGSEGV";  break;
-    case SIGTERM: name = "SIGTERM";  break;
-  }
-
-  if (sig == SIGINT || sig == SIGTERM) {
-    if (name) {
-      NLOG(DEBUG) << "Terminating " << piac::daemon_executable() << ", signal: "
-                  << sig << " (" << name << ')';
-    } else {
-      NLOG(DEBUG) << "Terminating " << piac::daemon_executable() << ", signal: "
-                  << sig;
-    }
-  } else {
-    NLOG(ERROR) << "Crashed " << piac::daemon_executable();
-    el::Helpers::logCrashReason( sig, true );
-  }
-  // FOLLOWING LINE IS ABSOLUTELY NEEDED TO ABORT APPLICATION
-  el::Helpers::crashAbort( sig );
 }
 
 // *****************************************************************************

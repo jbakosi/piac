@@ -63,35 +63,6 @@ void db_cmd( bool connected, zmq::socket_t& socket, const std::string& cmd )
 }
 
 // *****************************************************************************
-void crash_handler( int sig ) {
-  // associate each signal with a signal name string.
-  const char* name = nullptr;
-  switch( sig ) {
-    case SIGABRT: name = "SIGABRT";  break;
-    case SIGFPE:  name = "SIGFPE";   break;
-    case SIGILL:  name = "SIGILL";   break;
-    case SIGINT:  name = "SIGINT";   break;
-    case SIGSEGV: name = "SIGSEGV";  break;
-    case SIGTERM: name = "SIGTERM";  break;
-  }
-
-  if (sig == SIGINT || sig == SIGTERM) {
-    if (name) {
-      NLOG(DEBUG) << "Terminating " << piac::cli_executable() << ", signal: "
-                  << sig << " (" << name << ')';
-    } else {
-      NLOG(DEBUG) << "Terminating " << piac::cli_executable() << ", signal: "
-                  << sig;
-    }
-  } else {
-    NLOG(ERROR) << "Crashed " << piac::cli_executable();
-    el::Helpers::logCrashReason( sig, true );
-  }
-  // FOLLOWING LINE IS ABSOLUTELY NEEDED TO ABORT APPLICATION
-  el::Helpers::crashAbort( sig );
-}
-
-// *****************************************************************************
 int main( int argc, char **argv ) {
   try {
     // Setup logging
