@@ -1,11 +1,11 @@
 # piac 
 
+[![status-badge](https://ci.codeberg.org/api/badges/piac/piac/status.svg)](https://ci.codeberg.org/piac/piac)
+
 _Buy and sell anything privately and securely_
 
 This project is work-in-progress. Questions? Contact us on
 [matrix](https://matrix.to/#/@jbakosi:matrix.org).
-
-[![status-badge](https://ci.codeberg.org/api/badges/piac/piac/status.svg)](https://ci.codeberg.org/piac/piac)
 
 ## Planned features
 
