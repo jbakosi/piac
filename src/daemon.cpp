@@ -72,11 +72,27 @@ void run_server( const std::string& db_name, int server_port ) {
 }
 
 void crash_handler( int sig ) {
-  if (sig == SIGINT) {
-    NLOG(DEBUG) << "Ctrl-C pressed, " << piac::daemon_executable()
-                << " exiting";
+  // associate each signal with a signal name string.
+  const char* name = nullptr;
+  switch( sig ) {
+    case SIGABRT: name = "SIGABRT";  break;
+    case SIGFPE:  name = "SIGFPE";   break;
+    case SIGILL:  name = "SIGILL";   break;
+    case SIGINT:  name = "SIGINT";   break;
+    case SIGSEGV: name = "SIGSEGV";  break;
+    case SIGTERM: name = "SIGTERM";  break;
+  }
+
+  if (sig == SIGINT || sig == SIGTERM) {
+    if (name) {
+      NLOG(DEBUG) << "Terminating " << piac::daemon_executable() << ", signal: "
+                  << sig << " (" << name << ')';
+    } else {
+      NLOG(DEBUG) << "Terminating " << piac::daemon_executable() << ", signal: "
+                  << sig;
+    }
   } else {
-    NLOG(ERROR) << "Crashed!";
+    NLOG(ERROR) << "Crashed " << piac::daemon_executable();
     el::Helpers::logCrashReason( sig, true );
   }
   // FOLLOWING LINE IS ABSOLUTELY NEEDED TO ABORT APPLICATION
