@@ -11,7 +11,7 @@
 #
 # Usage:
 #
-# docker build --build-arg COMMIT=master -f debian -t piac --build-arg COMMIT=main --no-cache .
+# docker build -f debian -t piac . #--build-arg COMMIT=master --no-cache
 # ~/.local/bin/docker-squash --cleanup piac:latest -t jbakosi/piac:latest
 # docker push jbakosi/piac
 #
@@ -22,7 +22,7 @@
 FROM debian:bullseye
 
 # Install system-wide prerequisites
-RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libxapian-dev libeasyloggingpp-dev
+RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev
 
 # Clone piac
 RUN git clone https://codeberg.org/piac/piac.git
@@ -36,7 +36,7 @@ RUN cd piac && mkdir -p external/build && cd external/build && cmake .. && make 
 RUN rm -rf piac/external/build
 
 # The commands below can be used to build and test piac if anything
-# upstream is updated. After no error, they should remain commented.
+# upstream is updated. After no error, they should be commented.
 
 # Build piac
 #RUN cd piac && mkdir -p build && cd build && cmake .. && make -sj$(grep -c processor /proc/cpuinfo)

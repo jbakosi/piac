@@ -80,11 +80,6 @@ message(STATUS "Third-party (external) libraries install directory: " ${TPL_DIR}
 set(cli_DIR ${TPL_DIR}/lib/cmake/cli)
 find_package(cli REQUIRED)
 
-## Find Threads
-#set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-#set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-#find_package(Threads REQUIRED)
-
 # Find Monero
 find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
 

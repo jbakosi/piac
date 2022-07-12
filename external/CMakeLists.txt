@@ -98,27 +98,6 @@ ExternalProject_Add(
   LOG_BUILD 1
 )
 
-# rapidjson from monero
-ExternalProject_Add(
-  rapidjson
-  PREFIX rapidjson
-  DEPENDS monero
-  SOURCE_DIR ${PROJECT_BINARY_DIR}/monero/src/monero/external/rapidjson
-  CMAKE_ARGS
-     -D CMAKE_C_COMPILER:PATH=${CMAKE_C_COMPILER}
-     -D CMAKE_CXX_COMPILER:PATH=${CMAKE_CXX_COMPILER}
-     -D CMAKE_CXX_FLAGS:STRING=-w
-     -D BUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
-     -D CMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
-     -D RAPIDJSON_BUILD_TESTS:BOOL=false
-     -D RAPIDJSON_BUILD_EXAMPLES:BOOL=false
-     -D RAPIDJSON_BUILD_DOC:BOOL=false
-  DOWNLOAD_COMMAND ""
-  LOG_DOWNLOAD 1
-  LOG_CONFIGURE 1
-  LOG_BUILD 1
-)
-
 # daniele77/cli
 ExternalProject_Add(
   cli
