@@ -25,7 +25,7 @@ This project is work-in-progress. Questions? Contact us on
 * Built-in monero node or connect to remote nodes
 
 
-## Building
+## Build
 
 ```sh
 # Install system-wide prerequisites on Debian/Ubuntu Linux
@@ -40,7 +40,7 @@ mkdir build && cd build && cmake .. && make && cd -
 cd build && ctest
 ```
 
-## Running
+## Run
 ```sh
 # Run daemon
 cd piac/build
@@ -50,7 +50,7 @@ cd piac/build
 ./piac-cli
 ```
 
-## Contributing
+## Contribute
 
 Contact us on [matrix](https://matrix.to/#/@jbakosi:matrix.org).
 
@@ -58,5 +58,5 @@ Contact us on [matrix](https://matrix.to/#/@jbakosi:matrix.org).
 
 GPL v3.
 
-## Pronouncing
+## Pronounce
 [[ˈpijɒt͡s]](https://en.wiktionary.org/wiki/piac)
