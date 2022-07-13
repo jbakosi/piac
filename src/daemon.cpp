@@ -9,8 +9,8 @@
 #include "db.hpp"
 
 // *****************************************************************************
-void run_database( const std::string& db_name,
-                   const std::string& input_filename )
+void database_thread( const std::string& db_name,
+                      const std::string& input_filename )
 {
   el::Helpers::setThreadName( "db" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
@@ -53,7 +53,7 @@ void interpret_query( const std::string& db_name, zmq::socket_t& socket,
 }
 
 // *****************************************************************************
-void run_server( const std::string& db_name, int server_port ) {
+void server_thread( const std::string& db_name, int server_port ) {
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
   // initialize zmq context with a single IO thread
@@ -200,8 +200,8 @@ int main( int argc, char **argv ) {
 
   // start some threads
   std::vector< std::thread > daemon_threads;
-  daemon_threads.emplace_back( run_server, db_name, server_port );
-  daemon_threads.emplace_back( run_database, db_name, input_filename );
+  daemon_threads.emplace_back( server_thread, db_name, server_port );
+  daemon_threads.emplace_back( database_thread, db_name, input_filename );
 
   // wait for all threads to finish
   for (auto& t : daemon_threads) t.join();
