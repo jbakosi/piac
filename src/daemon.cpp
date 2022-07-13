@@ -2,7 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <boost/program_options.hpp>
-#include <zmq.hpp>
+#include <zmqpp/zmqpp.hpp>
 
 #include "logging.hpp"
 #include "project_config.hpp"
@@ -30,25 +30,25 @@ void database_thread( const std::string& db_name,
 }
 
 // *****************************************************************************
-void interpret_query( const std::string& db_name, zmq::socket_t& socket,
+void interpret_query( const std::string& db_name, zmqpp::socket& socket,
                       std::string&& q )
 {
   NLOG(DEBUG) << "Interpreting message: '" << q << "'";
   if (q[0]=='c' && q[1]=='o') {
     const std::string q( "accept" );
     NLOG(DEBUG) << "Sending message: '" << q << "'";
-    socket.send( zmq::buffer(q), zmq::send_flags::none );
+    socket.send( "accept" );
   } else if (q[0]=='d' && q[1]=='b') {
     if (q[2]==' ' && q[3]=='q') {
       auto result = piac::db_query( db_name, std::move(q) );
-      socket.send( zmq::buffer(result), zmq::send_flags::none );
+      socket.send( result );
     } else if (q[2]==' ' && q[3]=='a') {
       auto result = piac::db_add( db_name, std::move(q) );
-      socket.send( zmq::buffer(result), zmq::send_flags::none );
+      socket.send( result );
     }
   } else {
     NLOG(ERROR) << "unknown command";
-    socket.send( zmq::buffer("unknown command"), zmq::send_flags::none );
+    socket.send( "unknown command" );
   }
 }
 
@@ -56,18 +56,18 @@ void interpret_query( const std::string& db_name, zmq::socket_t& socket,
 void server_thread( const std::string& db_name, int server_port ) {
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  // initialize zmq context with a single IO thread
-  zmq::context_t context{ 1 };
+  // initialize zmq context
+  zmqpp::context context;
   // construct a REP (reply) socket and bind to interface
-  zmq::socket_t socket{ context, zmq::socket_type::rep };
+  zmqpp::socket socket{ context, zmqpp::socket_type::rep };
   socket.bind( "tcp://*:" + std::to_string(server_port) );
   NLOG(INFO) << "Server bound to port " << server_port;
   // listen for messages
   while (not g_interrupted) {
-    zmq::message_t request;
-    auto res = socket.recv( request, zmq::recv_flags::none );
-    NLOG(DEBUG) << "Received message: '" << request.to_string() << "'";
-    interpret_query( db_name, socket, request.to_string() );
+    std::string request;
+    auto res = socket.receive( request );
+    NLOG(DEBUG) << "Received message: '" << request << "'";
+    interpret_query( db_name, socket, std::move(request) );
   }
 }
 

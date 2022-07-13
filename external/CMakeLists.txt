@@ -98,6 +98,23 @@ ExternalProject_Add(
   LOG_BUILD 1
 )
 
+# zmqpp
+ExternalProject_Add(
+  zmqpp
+  PREFIX zmqpp
+  GIT_REPOSITORY https://github.com/zeromq/zmqpp.git
+  GIT_TAG 4.2.0
+  GIT_SHALLOW 1
+  CMAKE_ARGS
+     -D CMAKE_C_COMPILER:PATH=${CMAKE_C_COMPILER}
+     -D CMAKE_CXX_COMPILER:PATH=${CMAKE_CXX_COMPILER}
+     -D BUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
+     -D CMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  LOG_DOWNLOAD 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+)
+
 # daniele77/cli
 ExternalProject_Add(
   cli

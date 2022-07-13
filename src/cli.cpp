@@ -1,27 +1,27 @@
 #include <cli/cli.h>
 #include <cli/clilocalsession.h>
 #include <cli/loopscheduler.h>
-#include <zmq.hpp>
+#include <zmqpp/zmqpp.hpp>
 
 #include "logging.hpp"
 #include "project_config.hpp"
 
 // *****************************************************************************
-void connect( zmq::socket_t& socket, const std::string& host, int port )
+void connect( zmqpp::socket& socket, const std::string& host, int port )
 {
   NLOG(DEBUG) << "connect";
   NLOG(INFO) << "Connecting to piac daemon " << host << ':' << port << " ... ";
   socket.connect( "tcp://" + host + ':' + std::to_string(port) );
-  socket.send( zmq::message_t("connect"), zmq::send_flags::none );
+  socket.send( "connect" );
   // wait for reply from server
-  zmq::message_t reply{};
-  auto res = socket.recv( reply, zmq::recv_flags::none );
-  NLOG(DEBUG) << reply.to_string();
-  if (reply.to_string() == "accept") NLOG(INFO) << "Connected.";
+  std::string reply;
+  auto res = socket.receive( reply );
+  NLOG(DEBUG) << reply;
+  if (reply == "accept") NLOG(INFO) << "Connected.";
 }
 
 // *****************************************************************************
-void disconnect( bool& connected, zmq::socket_t& socket,
+void disconnect( bool& connected, zmqpp::socket& socket,
                  const std::string& host, int port )
 {
   NLOG(DEBUG) << "disconnect";
@@ -45,7 +45,7 @@ void status( bool connected )
 }
 
 // *****************************************************************************
-void db_cmd( bool connected, zmq::socket_t& socket, const std::string& cmd )
+void db_cmd( bool connected, zmqpp::socket& socket, const std::string& cmd )
 {
   NLOG(DEBUG) << "db";
   if (not connected) {
@@ -54,12 +54,11 @@ void db_cmd( bool connected, zmq::socket_t& socket, const std::string& cmd )
   }
 
   // send message with db command
-  const std::string q( "db " + cmd );
-  socket.send( zmq::message_t(q), zmq::send_flags::none );
+  socket.send( "db " + cmd );
   // wait for reply from server
-  zmq::message_t reply{};
-  auto res = socket.recv( reply, zmq::recv_flags::none );
-  NLOG(INFO) << reply.to_string();
+  std::string reply;
+  auto res = socket.receive( reply );
+  NLOG(INFO) << reply;
 }
 
 // *****************************************************************************
@@ -94,10 +93,10 @@ int main( int argc, char **argv ) {
     bool connected = false;
 
     // initialize the zmq context with a single IO thread
-    zmq::context_t context{ 1 };
+    zmqpp::context context;
 
     // construct a REQ (request) socket and connect to interface
-    zmq::socket_t socket{ context, zmq::socket_type::req };
+    zmqpp::socket socket{ context, zmqpp::socket_type::req };
 
     auto rootMenu = std::make_unique< cli::Menu >( "piac" );
 

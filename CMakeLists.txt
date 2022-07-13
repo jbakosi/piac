@@ -86,8 +86,9 @@ find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
 # Find Boost
 find_package(Boost REQUIRED COMPONENTS program_options)
 
-# Find ZeroMQ
-find_package(ZMQ REQUIRED)
+# Find zmqpp
+set(zmqpp_dir ${TPL_DIR})
+find_package(ZMQPP REQUIRED)
 
 # Find Xapian
 find_package(Xapian REQUIRED)
@@ -120,12 +121,13 @@ add_executable(${DAEMON_EXECUTABLE}
                ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
 target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
                       db
                       ${Boost_LIBRARIES}
                       ${XAPIAN_LIBRARIES}
-                      ${ZMQ_LIBRARIES}
+                      ${ZMQPP_LIBRARIES}
                       Threads::Threads)
 install(TARGETS ${DAEMON_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
@@ -141,10 +143,11 @@ add_executable(${CLI_EXECUTABLE}
                ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
 target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       cli::cli
-                      ${ZMQ_LIBRARIES})
+                      ${ZMQPP_LIBRARIES})
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
