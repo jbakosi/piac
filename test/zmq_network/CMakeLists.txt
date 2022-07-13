@@ -9,8 +9,8 @@ add_test(NAME daemon_arg_version COMMAND ${DAEMON_EXECUTABLE} --version)
 set_tests_properties(daemon_arg_version PROPERTIES
                      PASS_REGULAR_EXPRESSION "${DAEMON_EXECUTABLE} v")
 
-add_test(NAME daemon_badarg COMMAND ${DAEMON_EXECUTABLE} asdf)
-set_tests_properties(daemon_badarg PROPERTIES
+add_test(NAME daemon_arg_bad COMMAND ${DAEMON_EXECUTABLE} asdf)
+set_tests_properties(daemon_arg_bad PROPERTIES
                      PASS_REGULAR_EXPRESSION "too many positional options")
 
 # cli tests that don't require daemon
@@ -26,15 +26,23 @@ add_test(NAME cli_version
 set_tests_properties(cli_version PROPERTIES
                      PASS_REGULAR_EXPRESSION "${CLI_EXECUTABLE} v")
 
-add_test(NAME cli_badarg COMMAND ${CLI_EXECUTABLE} asdf)
-set_tests_properties(cli_badarg PROPERTIES
-                     PASS_REGULAR_EXPRESSION "No command line arguments")
+add_test(NAME cli_arg_version COMMAND ${CLI_EXECUTABLE} --version)
+set_tests_properties(cli_arg_version PROPERTIES
+                     PASS_REGULAR_EXPRESSION "${CLI_EXECUTABLE} v")
+
+add_test(NAME cli_arg_help COMMAND ${CLI_EXECUTABLE} --help)
+set_tests_properties(cli_arg_help PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Show help message")
+
+add_test(NAME cli_arg_bad COMMAND ${CLI_EXECUTABLE} asdf)
+set_tests_properties(cli_arg_bad PROPERTIES
+                     PASS_REGULAR_EXPRESSION "too many positional options")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.help" _in)
 add_test(NAME cli_help
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_help PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Commands available")
+                     PASS_REGULAR_EXPRESSION "Commands:")
 
 # configure helper executable to kill daemon
 add_executable(kill_daemon kill_daemon.cpp)

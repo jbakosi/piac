@@ -34,21 +34,31 @@ void interpret_query( const std::string& db_name, zmqpp::socket& socket,
                       std::string&& q )
 {
   NLOG(DEBUG) << "Interpreting message: '" << q << "'";
+
   if (q[0]=='c' && q[1]=='o') {
+
     const std::string q( "accept" );
     NLOG(DEBUG) << "Sending message: '" << q << "'";
     socket.send( "accept" );
+
   } else if (q[0]=='d' && q[1]=='b') {
-    if (q[2]==' ' && q[3]=='q') {
+
+    q.erase( 0, 3 );
+    if (q[0]=='q' && q[1]=='u' && q[2]=='e' && q[3]=='r' && q[4]=='y') {
+      q.erase( 0, 5 );
       auto result = piac::db_query( db_name, std::move(q) );
       socket.send( result );
-    } else if (q[2]==' ' && q[3]=='a') {
+    } else if (q[0]=='a' && q[1]=='d' && q[2]=='d') {
+      q.erase( 0, 4 );
       auto result = piac::db_add( db_name, std::move(q) );
       socket.send( result );
     }
+
   } else {
+
     NLOG(ERROR) << "unknown command";
     socket.send( "unknown command" );
+
   }
 }
 
@@ -83,20 +93,10 @@ int main( int argc, char **argv ) {
   std::string version( "piac: " + piac::daemon_executable() + " v"
                        + piac::project_version() + "-" + piac::build_type() );
 
-  std::string welcome( "This is the daemon of piac. It can run standalone "
-    "or as a daemon in the\nbackground using --detach. You can use " +
-     piac::cli_executable() + " to interact with it." );
-
-  std::string usage( "Usage: " + piac::daemon_executable() + " [OPTIONS]" );
-
   // Defaults
   int server_port = 55090;
   std::string db_name( "piac.db" );
   std::string input_filename;
-
-  // Display initial info
-  NLOG(INFO) << version;
-  std::cout << welcome << std::endl;
 
   // Supported command line arguments
   namespace po = boost::program_options;
@@ -131,7 +131,8 @@ int main( int argc, char **argv ) {
   if (vm.count( "help" )) {
 
     NLOG(DEBUG) << "help";
-    NLOG(INFO) << usage;
+    NLOG(INFO) << "Usage: " + piac::daemon_executable() + " [OPTIONS]\n";
+
     std::stringstream ss;
     ss << desc;
     NLOG(INFO) << ss.str();
@@ -140,6 +141,7 @@ int main( int argc, char **argv ) {
   } else if (vm.count( "version" )) {
 
     NLOG(DEBUG) << "version";
+    NLOG(INFO) << version;
     return EXIT_SUCCESS;
 
   } else if (vm.count( "port" )) {
@@ -158,6 +160,14 @@ int main( int argc, char **argv ) {
     input_filename = vm[ "input" ].as< std::string >();
 
   }
+
+  NLOG(INFO) << version;
+  std::cout <<
+    "Welcome to piac, where anyone can buy and sell anything privately and\n"
+    "securely using the private digital cash, monero. For more information\n"
+    "on monero, see https://getmonero.org. This is the server of piac. It\n"
+    "can run standalone or as a daemon in the background using --detach.\n"
+    "You can use " + piac::cli_executable() + " to interact with it.\n";
 
   NLOG(INFO) << "Logging to " << logfile;
 
