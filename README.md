@@ -24,12 +24,11 @@ This project is work-in-progress. Questions? Contact us on
 * Wishlists
 * Built-in monero node or connect to remote nodes
 
-
 ## Build
 
 ```sh
 # Install system-wide prerequisites on Debian/Ubuntu Linux
-sudo apt-get install git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev
+sudo apt-get install git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev libreadline-dev
 # Clone piac
 git clone https://codeberg.org/piac/piac.git && cd piac
 # Build external libraries

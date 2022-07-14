@@ -12,17 +12,13 @@
 # Usage:
 #
 # docker build -f debian -t piac . #--build-arg COMMIT=master --no-cache
-# ~/.local/bin/docker-squash --cleanup piac:latest -t jbakosi/piac:latest
+# docker-squash --cleanup piac -t jbakosi/piac
 # docker push jbakosi/piac
-#
-# See also:
-#
-# https://pypi.org/project/docker-squash
 
 FROM debian:bullseye
 
 # Install system-wide prerequisites
-RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev
+RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev libreadline-dev
 
 # Clone piac
 RUN git clone https://codeberg.org/piac/piac.git
