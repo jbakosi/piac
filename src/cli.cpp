@@ -72,7 +72,7 @@ void db_cmd( bool connected, zmqpp::socket& socket, const std::string& cmd )
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
 
 // *****************************************************************************
-std::string string_color( const std::string &s, COLOR color = GRAY ) {
+std::string color_string( const std::string &s, COLOR color = GRAY ) {
   std::string ret;
   if (color == RED) ret = "\033[0;31m";
   if (color == GREEN) ret = "\033[0;32m";
@@ -152,8 +152,8 @@ int main( int argc, char **argv ) {
   zmqpp::socket socket{ context, zmqpp::socket_type::req };
 
   char* buf;
-  std::string prompt = string_color(piac::cli_executable(),GREEN) +
-                       string_color("> ",YELLOW);
+  std::string prompt = color_string( piac::cli_executable(),GREEN ) +
+                       color_string( "> ",YELLOW );
 
   while ((buf = readline( prompt.c_str() ) ) != nullptr) {
 
