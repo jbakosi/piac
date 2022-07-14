@@ -71,23 +71,22 @@ endif()
 set(TPL_INCLUDE_DIRS ${TPL_DIR}/include
                      ${TPL_DIR}/include/common
                      ${TPL_DIR}/include/utils
-                     ${TPL_DIR}/include/cli
                      ${TPL_DIR}/include/crypto
                      ${TPL_DIR}/include/storages)
 message(STATUS "Third-party (external) libraries install directory: " ${TPL_DIR})
 
-# Find daniele77/cli
-set(cli_DIR ${TPL_DIR}/lib/cmake/cli)
-find_package(cli REQUIRED)
-
 # Find Monero
 find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
 
-# Find Boost
-find_package(Boost REQUIRED COMPONENTS program_options)
+# Find threads
+find_package(Threads REQUIRED)
 
-# Find ZeroMQ
-find_package(ZMQ REQUIRED)
+# Find readline
+find_package(Readline REQUIRED)
+
+# Find zmqpp
+set(zmqpp_dir ${TPL_DIR})
+find_package(ZMQPP REQUIRED)
 
 # Find Xapian
 find_package(Xapian REQUIRED)
@@ -120,12 +119,12 @@ add_executable(${DAEMON_EXECUTABLE}
                ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
 target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
                       db
-                      ${Boost_LIBRARIES}
                       ${XAPIAN_LIBRARIES}
-                      ${ZMQ_LIBRARIES}
+                      ${ZMQPP_LIBRARIES}
                       Threads::Threads)
 install(TARGETS ${DAEMON_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
@@ -141,10 +140,11 @@ add_executable(${CLI_EXECUTABLE}
                ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
 target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
-                      cli::cli
-                      ${ZMQ_LIBRARIES})
+                      ${ZMQPP_LIBRARIES}
+                      ${Readline_LIBRARY})
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime

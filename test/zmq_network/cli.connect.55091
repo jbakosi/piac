@@ -1,2 +1,2 @@
-connect localhost 55091
+connect localhost:55091
 exit

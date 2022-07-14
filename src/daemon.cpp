@@ -1,8 +1,9 @@
 #include <vector>
 #include <iostream>
 #include <thread>
-#include <boost/program_options.hpp>
-#include <zmq.hpp>
+#include <zmqpp/zmqpp.hpp>
+#include <getopt.h>
+#include <unistd.h>
 
 #include "logging.hpp"
 #include "project_config.hpp"
@@ -30,25 +31,35 @@ void database_thread( const std::string& db_name,
 }
 
 // *****************************************************************************
-void interpret_query( const std::string& db_name, zmq::socket_t& socket,
+void interpret_query( const std::string& db_name, zmqpp::socket& socket,
                       std::string&& q )
 {
   NLOG(DEBUG) << "Interpreting message: '" << q << "'";
+
   if (q[0]=='c' && q[1]=='o') {
+
     const std::string q( "accept" );
     NLOG(DEBUG) << "Sending message: '" << q << "'";
-    socket.send( zmq::buffer(q), zmq::send_flags::none );
+    socket.send( "accept" );
+
   } else if (q[0]=='d' && q[1]=='b') {
-    if (q[2]==' ' && q[3]=='q') {
+
+    q.erase( 0, 3 );
+    if (q[0]=='q' && q[1]=='u' && q[2]=='e' && q[3]=='r' && q[4]=='y') {
+      q.erase( 0, 5 );
       auto result = piac::db_query( db_name, std::move(q) );
-      socket.send( zmq::buffer(result), zmq::send_flags::none );
-    } else if (q[2]==' ' && q[3]=='a') {
+      socket.send( result );
+    } else if (q[0]=='a' && q[1]=='d' && q[2]=='d') {
+      q.erase( 0, 4 );
       auto result = piac::db_add( db_name, std::move(q) );
-      socket.send( zmq::buffer(result), zmq::send_flags::none );
+      socket.send( result );
     }
+
   } else {
+
     NLOG(ERROR) << "unknown command";
-    socket.send( zmq::buffer("unknown command"), zmq::send_flags::none );
+    socket.send( "unknown command" );
+
   }
 }
 
@@ -56,18 +67,18 @@ void interpret_query( const std::string& db_name, zmq::socket_t& socket,
 void server_thread( const std::string& db_name, int server_port ) {
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  // initialize zmq context with a single IO thread
-  zmq::context_t context{ 1 };
+  // initialize zmq context
+  zmqpp::context context;
   // construct a REP (reply) socket and bind to interface
-  zmq::socket_t socket{ context, zmq::socket_type::rep };
+  zmqpp::socket socket{ context, zmqpp::socket_type::rep };
   socket.bind( "tcp://*:" + std::to_string(server_port) );
   NLOG(INFO) << "Server bound to port " << server_port;
   // listen for messages
   while (not g_interrupted) {
-    zmq::message_t request;
-    auto res = socket.recv( request, zmq::recv_flags::none );
-    NLOG(DEBUG) << "Received message: '" << request.to_string() << "'";
-    interpret_query( db_name, socket, request.to_string() );
+    std::string request;
+    auto res = socket.receive( request );
+    NLOG(DEBUG) << "Received message: '" << request << "'";
+    interpret_query( db_name, socket, std::move(request) );
   }
 }
 
@@ -83,85 +94,95 @@ int main( int argc, char **argv ) {
   std::string version( "piac: " + piac::daemon_executable() + " v"
                        + piac::project_version() + "-" + piac::build_type() );
 
-  std::string welcome( "This is the daemon of piac. It can run standalone "
-    "or as a daemon in the\nbackground using --detach. You can use " +
-     piac::cli_executable() + " to interact with it." );
-
-  std::string usage( "Usage: " + piac::daemon_executable() + " [OPTIONS]" );
-
   // Defaults
   int server_port = 55090;
   std::string db_name( "piac.db" );
   std::string input_filename;
 
-  // Display initial info
+  // Process command line arguments
+  int c;
+  int option_index = 0;
+  int detach = 0;
+  static struct option long_options[] =
+    {
+      // NAME     ARGUMENT           FLAG     SHORTNAME/VALUE
+      {"db",      required_argument, 0,       'd'},
+      {"detach",  no_argument,       &detach,  1 },
+      {"help",    no_argument,       0,       'h'},
+      {"input",   required_argument, 0,       'i'},
+      {"port",    required_argument, 0,       'p'},
+      {"version", no_argument,       0,       'v'},
+      {0, 0, 0, 0}
+    };
+  while ((c = getopt_long(argc, argv, "d:hi:p:v",
+                long_options, &option_index)) != -1)
+  {
+    switch (c) {
+      case 'd':
+        NLOG(DEBUG) << "db " << optarg;
+        db_name = optarg;
+        break;
+
+      case 'h':
+        NLOG(DEBUG) << "help";
+        NLOG(INFO) << "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
+          "OPTIONS\n"
+          "  -d, --db <directory>\n"
+          "         Use database, default: " + db_name + "\n\n"
+          "  --detach\n"
+          "         Run as a daemon in the background.\n\n"
+          "  -h, --help\n"
+          "         Show help message.\n\n"
+          "  -i, --input <filename.json>\n"
+          "         Add the contents of file to database.\n\n"
+          "  -p, --port <port>\n"
+          "         Listen on custom port, default: "
+                  + std::to_string( server_port ) + "\n\n"
+          "  -v, --version\n"
+          "         Show version information\n";
+        return EXIT_SUCCESS;
+
+      case 'i':
+        NLOG(DEBUG) << "input " << optarg;
+        input_filename = optarg;
+        break;
+
+      case 'p':
+        NLOG(DEBUG) << "port " << optarg;
+        server_port = atoi( optarg );
+        break;
+
+      case 'v':
+        NLOG(DEBUG) << "version";
+        NLOG(INFO) << version;
+        return EXIT_SUCCESS;
+
+      case '?':
+        return EXIT_FAILURE;
+
+      default:
+        NLOG(INFO) << "getopt() returned character code 0" << c;
+    }
+  }
+
+  if (optind < argc) {
+    printf( "%s: invalid options -- ", argv[0] );
+    while (optind < argc) printf( "%s ", argv[optind++] );
+    printf( "\n" );
+    return EXIT_FAILURE;
+  }
+
   NLOG(INFO) << version;
-  std::cout << welcome << std::endl;
-
-  // Supported command line arguments
-  namespace po = boost::program_options;
-  po::options_description desc( "Options" );
-  std::string port_help( "Listen on custom port, default: " );
-  port_help += std::to_string( server_port );
-  std::string db_help( "Use database, default: " + db_name );
-  std::string input_help( "Database input filename" );
-  desc.add_options()
-    ("help", "Show help message")
-    ("version", "Show version information")
-    ("detach", "Run as a daemon in the background")
-    ("port", po::value<int>(), port_help.c_str())
-    ("db", po::value<std::string>(), db_help.c_str())
-    ("input", po::value<std::string>(), input_help.c_str())
-  ;
-
-  po::variables_map vm;
-  try {
-    po::store(po::command_line_parser(argc, argv).
-              options(desc).positional({}).run(),
-              vm);
-  } catch (po::too_many_positional_options_error &e) {
-    NLOG(ERROR) << "Command line only accepts options with '--': " << e.what();
-    return EXIT_FAILURE;
-  } catch (po::error_with_option_name &e) {
-    NLOG(ERROR) << "Command line: " << e.what();
-    return EXIT_FAILURE;
-  }
-  po::notify( vm );
-
-  if (vm.count( "help" )) {
-
-    NLOG(DEBUG) << "help";
-    NLOG(INFO) << usage;
-    std::stringstream ss;
-    ss << desc;
-    NLOG(INFO) << ss.str();
-    return EXIT_SUCCESS;
-
-  } else if (vm.count( "version" )) {
-
-    NLOG(DEBUG) << "version";
-    return EXIT_SUCCESS;
-
-  } else if (vm.count( "port" )) {
-
-    NLOG(DEBUG) << "port";
-    server_port = vm[ "port" ].as< int >();
-
-  } else if (vm.count( "db" )) {
-
-    NLOG(DEBUG) << "db";
-    db_name = vm[ "db" ].as< std::string >();
-
-  } else if (vm.count( "input" )) {
-
-    NLOG(DEBUG) << "input";
-    input_filename = vm[ "input" ].as< std::string >();
-
-  }
+  std::cout <<
+    "Welcome to piac, where anyone can buy and sell anything privately and\n"
+    "securely using the private digital cash, monero. For more information\n"
+    "on monero, see https://getmonero.org. This is the server of piac. It\n"
+    "can run standalone or as a daemon in the background using --detach.\n"
+    "You can use " + piac::cli_executable() + " to interact with it.\n";
 
   NLOG(INFO) << "Logging to " << logfile;
 
-  if (vm.count( "detach" )) {
+  if (detach) {
 
     NLOG(INFO) << "Running in daemon mode";
 

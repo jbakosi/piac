@@ -1,4 +1,3 @@
-
 #include "logging.hpp"
 
 #include "db.hpp"
@@ -97,10 +96,9 @@ piac::index_db( const std::string& db_name, const std::string& input_filename )
 
 // *****************************************************************************
 std::string
-piac::db_query( const std::string& db_name, std::string&& query_string ) {
+piac::db_query( const std::string& db_name, std::string&& cmd ) {
   try {
-    query_string.erase( 0, 9 );
-    NLOG(DEBUG) << "Search db, cmd '" << query_string << "'";
+    NLOG(DEBUG) << "db query: " << cmd;
     // Open the database for searching
     Xapian::Database db( db_name );
     // Start an enquire session
@@ -111,27 +109,27 @@ piac::db_query( const std::string& db_name, std::string&& query_string ) {
     qp.set_stemmer( stemmer );
     qp.set_database( db );
     qp.set_stemming_strategy( Xapian::QueryParser::STEM_SOME );
-    Xapian::Query query = qp.parse_query( query_string );
-    NLOG(DEBUG) << "Parsed query: '" << query.get_description() << "'";
+    Xapian::Query query = qp.parse_query( cmd );
+    NLOG(DEBUG) << "parsed query: '" << query.get_description() << "'";
     // Find the top 10 results for the query
     enquire.set_query( query );
-    NLOG(DEBUG) << "Set query: '" << query.get_description() << "'";
+    NLOG(DEBUG) << "set query: '" << query.get_description() << "'";
     Xapian::MSet matches = enquire.get_mset( 0, 10 );
-    NLOG(DEBUG) << "Got matches";
+    NLOG(DEBUG) << "got matches";
     // Construct the results
     auto nr = matches.get_matches_estimated();
-    NLOG(DEBUG) << "Got estimated matches: " << nr;
+    NLOG(DEBUG) << "got estimated matches: " << nr;
     std::stringstream result;
     result << nr << " results found.";
     if (nr) {
-      result << "\nMatches 1-" << matches.size() << ":\n\n";
+      result << "\nmatches 1-" << matches.size() << ":\n\n";
       for (Xapian::MSetIterator i = matches.begin(); i != matches.end(); ++i) {
-        NLOG(DEBUG) << "Getting match: " << i.get_rank();
+        NLOG(DEBUG) << "getting match: " << i.get_rank();
         result << i.get_rank() + 1 << ": " << i.get_weight() << " docid=" << *i
                  << " [" << i.get_document().get_data() << "]\n";
       }
     }
-    NLOG(DEBUG) << "Results: " + result.str();
+    NLOG(DEBUG) << "results: " + result.str();
     return result.str();
   } catch ( const Xapian::Error &e ) {
     NLOG(ERROR) << e.get_description();
@@ -141,13 +139,12 @@ piac::db_query( const std::string& db_name, std::string&& query_string ) {
 
 // *****************************************************************************
 std::string
-piac::db_add( const std::string& db_name, std::string&& cmd_string ) {
-  cmd_string.erase( 0, 7 );
-  NLOG(DEBUG) << "Add db, cmd '" << cmd_string << "'";
-  if (cmd_string[0]=='j' && cmd_string[1]=='s') {
-    cmd_string.erase( 0, 5 );
-    NLOG(DEBUG) << "Add json file: '" << cmd_string << "' to db";
-    return "Added " + std::to_string(index_db(db_name,cmd_string.c_str())) +
+piac::db_add( const std::string& db_name, std::string&& cmd ) {
+  NLOG(DEBUG) << "db add: " << cmd;
+  if (cmd[0]=='j' && cmd[1]=='s' && cmd[2]=='o' && cmd[3]=='n') {
+    cmd.erase( 0, 5 );
+    NLOG(DEBUG) << "Add json file: '" << cmd << "' to db";
+    return "Added " + std::to_string( index_db( db_name, cmd.c_str() ) ) +
            " entries";
   }
   return {};
