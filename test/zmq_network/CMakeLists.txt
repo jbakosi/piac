@@ -11,7 +11,7 @@ set_tests_properties(daemon_arg_version PROPERTIES
 
 add_test(NAME daemon_arg_bad COMMAND ${DAEMON_EXECUTABLE} asdf)
 set_tests_properties(daemon_arg_bad PROPERTIES
-                     PASS_REGULAR_EXPRESSION "too many positional options")
+                     PASS_REGULAR_EXPRESSION "invalid option")
 
 # cli tests that don't require daemon
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.status.not_connected" _in)
@@ -36,7 +36,7 @@ set_tests_properties(cli_arg_help PROPERTIES
 
 add_test(NAME cli_arg_bad COMMAND ${CLI_EXECUTABLE} asdf)
 set_tests_properties(cli_arg_bad PROPERTIES
-                     PASS_REGULAR_EXPRESSION "too many positional options")
+                     PASS_REGULAR_EXPRESSION "invalid option")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.help" _in)
 add_test(NAME cli_help

@@ -78,9 +78,6 @@ message(STATUS "Third-party (external) libraries install directory: " ${TPL_DIR}
 # Find Monero
 find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
 
-# Find Boost
-find_package(Boost REQUIRED COMPONENTS program_options)
-
 # Find threads
 find_package(Threads REQUIRED)
 
@@ -126,7 +123,6 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
                       db
-                      ${Boost_LIBRARIES}
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
                       Threads::Threads)
@@ -148,7 +144,6 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       ${ZMQPP_LIBRARIES}
-                      ${Boost_LIBRARIES}
                       ${Readline_LIBRARY})
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime

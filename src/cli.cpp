@@ -1,7 +1,7 @@
 #include <zmqpp/zmqpp.hpp>
 #include <readline/history.h>
 #include <readline/readline.h>
-#include <boost/program_options.hpp>
+#include <getopt.h>
 
 #include "logging.hpp"
 #include "project_config.hpp"
@@ -93,44 +93,48 @@ int main( int argc, char **argv ) {
                        + piac::project_version() + "-"
                        + piac::build_type() );
 
-  // Supported command line arguments
-  namespace po = boost::program_options;
-  po::options_description desc( "Options" );
-  desc.add_options()
-    ("help", "Show help message")
-    ("version", "Show version information")
-  ;
+  // Process command line arguments
+  int c;
+  int option_index = 0;
+  static struct option long_options[] =
+    {
+      /* NAME     ARGUMENT     FLAG SHORTNAME */
+      {"help",    no_argument, 0,   'h'},
+      {"version", no_argument, 0,   'v'},
+      {0, 0, 0, 0}
+    };
+  while ((c = getopt_long(argc, argv, "hv",
+                long_options, &option_index)) != -1)
+  {
+    switch (c) {
+      case 'h':
+        NLOG(DEBUG) << "help";
+        NLOG(INFO) << "Usage: " + piac::cli_executable() + " [OPTIONS]\n\n"
+                      "OPTIONS\n"
+                      "  -h, --help\n"
+                      "         Show help message.\n\n"
+                      "  -v, --version\n"
+                      "         Show version information\n";
+        return EXIT_SUCCESS;
 
-  po::variables_map vm;
-  try {
-    po::store(po::command_line_parser(argc, argv).
-              options(desc).positional({}).run(),
-              vm);
-  } catch (po::too_many_positional_options_error &e) {
-    NLOG(ERROR) << "Command line only accepts options with '--': " << e.what();
-    return EXIT_FAILURE;
-  } catch (po::error_with_option_name &e) {
-    NLOG(ERROR) << "Command line: " << e.what();
-    return EXIT_FAILURE;
+      case 'v':
+        NLOG(DEBUG) << "version";
+        NLOG(INFO) << version;
+        return EXIT_SUCCESS;
+
+      case '?':
+        return EXIT_FAILURE;
+
+      default:
+        NLOG(INFO) << "getopt() returned character code 0" << c;
+    }
   }
-  po::notify( vm );
 
-  if (vm.count( "help" )) {
-
-    NLOG(DEBUG) << "help";
-    NLOG(INFO) << "Usage: " + piac::cli_executable() + " [OPTIONS]\n";
-
-    std::stringstream ss;
-    ss << desc;
-    NLOG(INFO) << ss.str();
-    return EXIT_SUCCESS;
-
-  } else if (vm.count( "version" )) {
-
-    NLOG(DEBUG) << "version";
-    NLOG(INFO) << version;
-    return EXIT_SUCCESS;
-
+  if (optind < argc) {
+    printf( "%s: invalid options -- ", argv[0] );
+    while (optind < argc) printf( "%s ", argv[optind++] );
+    printf( "\n" );
+    return EXIT_FAILURE;
   }
 
   NLOG(INFO) << version;

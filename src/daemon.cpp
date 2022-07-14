@@ -1,8 +1,9 @@
 #include <vector>
 #include <iostream>
 #include <thread>
-#include <boost/program_options.hpp>
 #include <zmqpp/zmqpp.hpp>
+#include <getopt.h>
+#include <unistd.h>
 
 #include "logging.hpp"
 #include "project_config.hpp"
@@ -98,67 +99,77 @@ int main( int argc, char **argv ) {
   std::string db_name( "piac.db" );
   std::string input_filename;
 
-  // Supported command line arguments
-  namespace po = boost::program_options;
-  po::options_description desc( "Options" );
-  std::string port_help( "Listen on custom port, default: " );
-  port_help += std::to_string( server_port );
-  std::string db_help( "Use database, default: " + db_name );
-  std::string input_help( "Database input filename" );
-  desc.add_options()
-    ("help", "Show help message")
-    ("version", "Show version information")
-    ("detach", "Run as a daemon in the background")
-    ("port", po::value<int>(), port_help.c_str())
-    ("db", po::value<std::string>(), db_help.c_str())
-    ("input", po::value<std::string>(), input_help.c_str())
-  ;
+  // Process command line arguments
+  int c;
+  int option_index = 0;
+  int detach = 0;
+  static struct option long_options[] =
+    {
+      // NAME     ARGUMENT           FLAG     SHORTNAME/VALUE
+      {"db",      required_argument, 0,       'd'},
+      {"detach",  no_argument,       &detach,  1 },
+      {"help",    no_argument,       0,       'h'},
+      {"input",   required_argument, 0,       'i'},
+      {"port",    required_argument, 0,       'p'},
+      {"version", no_argument,       0,       'v'},
+      {0, 0, 0, 0}
+    };
+  while ((c = getopt_long(argc, argv, "d:hi:p:v",
+                long_options, &option_index)) != -1)
+  {
+    switch (c) {
+      case 'd':
+        NLOG(DEBUG) << "db " << optarg;
+        db_name = optarg;
+        break;
 
-  po::variables_map vm;
-  try {
-    po::store(po::command_line_parser(argc, argv).
-              options(desc).positional({}).run(),
-              vm);
-  } catch (po::too_many_positional_options_error &e) {
-    NLOG(ERROR) << "Command line only accepts options with '--': " << e.what();
-    return EXIT_FAILURE;
-  } catch (po::error_with_option_name &e) {
-    NLOG(ERROR) << "Command line: " << e.what();
-    return EXIT_FAILURE;
+      case 'h':
+        NLOG(DEBUG) << "help";
+        NLOG(INFO) << "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
+          "OPTIONS\n"
+          "  -d, --db <directory>\n"
+          "         Use database, default: " + db_name + "\n\n"
+          "  --detach\n"
+          "         Run as a daemon in the background.\n\n"
+          "  -h, --help\n"
+          "         Show help message.\n\n"
+          "  -i, --input <filename.json>\n"
+          "         Add the contents of file to database.\n\n"
+          "  -p, --port <port>\n"
+          "         Listen on custom port, default: "
+                  + std::to_string( server_port ) + "\n\n"
+          "  -v, --version\n"
+          "         Show version information\n";
+        return EXIT_SUCCESS;
+
+      case 'i':
+        NLOG(DEBUG) << "input " << optarg;
+        input_filename = optarg;
+        break;
+
+      case 'p':
+        NLOG(DEBUG) << "port " << optarg;
+        server_port = atoi( optarg );
+        break;
+
+      case 'v':
+        NLOG(DEBUG) << "version";
+        NLOG(INFO) << version;
+        return EXIT_SUCCESS;
+
+      case '?':
+        return EXIT_FAILURE;
+
+      default:
+        NLOG(INFO) << "getopt() returned character code 0" << c;
+    }
   }
-  po::notify( vm );
 
-  if (vm.count( "help" )) {
-
-    NLOG(DEBUG) << "help";
-    NLOG(INFO) << "Usage: " + piac::daemon_executable() + " [OPTIONS]\n";
-
-    std::stringstream ss;
-    ss << desc;
-    NLOG(INFO) << ss.str();
-    return EXIT_SUCCESS;
-
-  } else if (vm.count( "version" )) {
-
-    NLOG(DEBUG) << "version";
-    NLOG(INFO) << version;
-    return EXIT_SUCCESS;
-
-  } else if (vm.count( "port" )) {
-
-    NLOG(DEBUG) << "port";
-    server_port = vm[ "port" ].as< int >();
-
-  } else if (vm.count( "db" )) {
-
-    NLOG(DEBUG) << "db";
-    db_name = vm[ "db" ].as< std::string >();
-
-  } else if (vm.count( "input" )) {
-
-    NLOG(DEBUG) << "input";
-    input_filename = vm[ "input" ].as< std::string >();
-
+  if (optind < argc) {
+    printf( "%s: invalid options -- ", argv[0] );
+    while (optind < argc) printf( "%s ", argv[optind++] );
+    printf( "\n" );
+    return EXIT_FAILURE;
   }
 
   NLOG(INFO) << version;
@@ -171,7 +182,7 @@ int main( int argc, char **argv ) {
 
   NLOG(INFO) << "Logging to " << logfile;
 
-  if (vm.count( "detach" )) {
+  if (detach) {
 
     NLOG(INFO) << "Running in daemon mode";
 
