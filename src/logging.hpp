@@ -7,7 +7,7 @@ static std::string g_executable;
 static bool g_interrupted = false;
 
 // *****************************************************************************
-void crash_handler( int sig ) {
+static void crash_handler( int sig ) {
   g_interrupted = true;
   // associate each signal with a signal name string.
   const char* name = nullptr;

@@ -8,12 +8,12 @@
 
 // *****************************************************************************
 void disconnect( bool& connected,
-                 zmqpp::socket& socket,
+                 zmqpp::socket& server,
                  const std::string& host )
 {
   NLOG(DEBUG) << "disconnect";
   if (connected) {
-    socket.disconnect( "tcp://" + host );
+    server.disconnect( "tcp://" + host );
     NLOG(INFO) << "Disconnected";
   } else {
     NLOG(INFO) << "Not connected";
@@ -22,7 +22,7 @@ void disconnect( bool& connected,
 }
 
 // *****************************************************************************
-void connect( bool& connected, zmqpp::socket& socket, const std::string& host )
+void connect( bool& connected, zmqpp::socket& server, const std::string& host )
 {
   if (connected) {
     NLOG(INFO) << "You need to disconnect first";
@@ -30,11 +30,11 @@ void connect( bool& connected, zmqpp::socket& socket, const std::string& host )
   }
   NLOG(DEBUG) << "connect";
   NLOG(INFO) << "Connecting to " + piac::daemon_executable() << " at " << host;
-  socket.connect( "tcp://" + host );
-  socket.send( "connect" );
+  server.connect( "tcp://" + host );
+  server.send( "connect" );
   // wait for reply from server
   std::string reply;
-  auto res = socket.receive( reply );
+  auto res = server.receive( reply );
   NLOG(DEBUG) << reply;
   if (reply == "accept") {
     NLOG(INFO) << "Connected.";
@@ -43,8 +43,7 @@ void connect( bool& connected, zmqpp::socket& socket, const std::string& host )
 }
 
 // *****************************************************************************
-void status( bool connected )
-{
+void status( bool connected ) {
   NLOG(DEBUG) << "status";
   if (connected)
     NLOG(INFO) << "Connected";
@@ -53,22 +52,21 @@ void status( bool connected )
 }
 
 // *****************************************************************************
-void db_cmd( bool connected, zmqpp::socket& socket, const std::string& cmd )
-{
+void send_cmd( bool connected, zmqpp::socket& server, const std::string& cmd ) {
   NLOG(DEBUG) << cmd;
   if (not connected) {
     NLOG(INFO) << "Not connected. Use 'connect' to connect to "
                << piac::daemon_executable() << '.';
     return;
   }
-
-  // send message with db command
-  socket.send( cmd );
+  // send message to server with command
+  server.send( cmd );
   // wait for reply from server
   std::string reply;
-  auto res = socket.receive( reply );
+  auto res = server.receive( reply );
   NLOG(INFO) << reply;
 }
+
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
 
 // *****************************************************************************
@@ -97,8 +95,7 @@ int main( int argc, char **argv ) {
   int c;
   int option_index = 0;
   static struct option long_options[] =
-    {
-      /* NAME     ARGUMENT     FLAG SHORTNAME */
+    { // NAME     ARGUMENT     FLAG SHORTNAME/FLAGVALUE
       {"help",    no_argument, 0,   'h'},
       {"version", no_argument, 0,   'v'},
       {0, 0, 0, 0}
@@ -152,8 +149,8 @@ int main( int argc, char **argv ) {
 
   // initialize the zmq context with a single IO thread
   zmqpp::context context;
-  // construct a REQ (request) socket and connect to interface
-  zmqpp::socket socket{ context, zmqpp::socket_type::req };
+  // construct a REQ (request) socket
+  zmqpp::socket server{ context, zmqpp::socket_type::req };
 
   char* buf;
   std::string prompt = color_string( piac::cli_executable(),GREEN ) +
@@ -169,17 +166,58 @@ int main( int argc, char **argv ) {
       if (not b.empty()) {
         std::stringstream ss( b );
         ss >> host;
-        std::cout << host << '\n';
       }
-      connect( connected, socket, host );
-
-    } else  if (!strcmp(buf,"disconnect")) {
-
-      disconnect( connected, socket, host );
+      connect( connected, server, host );
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
-      db_cmd( connected, socket, buf );
+      send_cmd( connected, server, buf );
+
+    } else  if (!strcmp(buf,"disconnect")) {
+
+      disconnect( connected, server, host );
+
+    } else if (!strcmp(buf,"exit") && !strcmp(buf,"quit")) {
+
+      free( buf );
+      break;
+
+    } else if (!strcmp(buf,"help")) {
+
+      std::cout << "COMMANDS\n"
+
+        "      connect [<host>[:<port>]]\n"
+        "                Connect to a " + piac::daemon_executable() + "."
+                        "The optional <host> argument specifies\n"
+        "                a hostname or an IPv4 address in standard dot "
+                         "notation. See\n"
+        "                'man gethostbyname'. The optional <port> argument is "
+                        "an\n"
+        "                integer specifying a port.\n\n"
+        "      db <command>\n"
+        "                Send database command to " + piac::daemon_executable()
+                         + ". You must have connected to\n"
+        "                a " + piac::daemon_executable() + " first. See "
+                        "'connect'.\n\n"
+        "      disconnect\n"
+	"                Disconnect from a " + piac::daemon_executable() + "\n\n"
+        "      exit, quit\n"
+        "                Exit\n\n"
+        "      help\n"
+        "                This help message\n\n"
+        "      peers\n"
+        "                List peers of " + piac::daemon_executable() + ". You "
+                        "must have connected to a " + piac::daemon_executable()
+                         + "\n"
+        "                first. See 'connect'.\n\n"
+        "      status\n"
+	"                Query status\n\n"
+        "      version\n"
+	"                Display " + piac::cli_executable() + " version\n";
+
+    } else if (!strcmp(buf,"peers")) {
+
+      send_cmd( connected, server, "peers" );
 
     } else if (!strcmp(buf,"status")) {
 
@@ -190,45 +228,6 @@ int main( int argc, char **argv ) {
       NLOG(DEBUG) << "version";
       NLOG(INFO) << version;
 
-    } else if (!strcmp(buf,"help")) {
-
-      std::cout << "Commands:\n"
-
-        "      help\n"
-        "                This help message\n\n"
-
-        "      exit\n"
-        "                Exit\n\n"
-
-        "      connect [<host>[:<port>]]\n"
-        "                Connect to a " + piac::daemon_executable() + "."
-                        "The optional <host> argument specifies\n"
-        "                a hostname or an IPv4 address in standard dot "
-                         "notation. See\n"
-        "                'man gethostbyname'. The optional <port> argument is "
-                        "an\n"
-        "                integer specifying a port.\n\n"
-
-        "      disconnect\n"
-	"                Disconnect from a " + piac::daemon_executable() + "\n\n"
-
-        "      db <command>\n"
-        "                Send database command to " + piac::daemon_executable()
-                         + ". You must have connected to\n"
-        "                a " + piac::daemon_executable() + " first. See "
-                        "'connect'.\n\n"
-
-        "      status\n"
-	"                Query status\n\n"
-
-        "      version\n"
-	"                Display neroshop-cli version\n";
-
-    } else if (!strcmp(buf,"exit") && !strcmp(buf,"quit")) {
-
-      free( buf );
-      break;
-
     }
 
     if (strlen( buf ) > 0) add_history( buf );
@@ -237,7 +236,7 @@ int main( int argc, char **argv ) {
     free( buf );
   }
 
-  disconnect( connected, socket, host );
+  disconnect( connected, server, host );
   NLOG(DEBUG) << "End " << piac::cli_executable() + '\n';
 
   return EXIT_SUCCESS;

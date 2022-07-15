@@ -12,4 +12,4 @@ pipeline:
   test:
     image: jbakosi/piac
     commands:
-      - cd build && ctest -j$(grep -c processor /proc/cpuinfo)
+      - cd build && ctest -j$(grep -c processor /proc/cpuinfo) --output-on-failure
