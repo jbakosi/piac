@@ -121,9 +121,6 @@ int main( int argc, char **argv ) {
 
       case '?':
         return EXIT_FAILURE;
-
-      default:
-        NLOG(INFO) << "getopt() returned character code 0" << c;
     }
   }
 
