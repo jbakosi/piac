@@ -174,7 +174,7 @@ int main( int argc, char **argv ) {
 
       disconnect( connected, server, host );
 
-    } else if (!strcmp(buf,"exit") && !strcmp(buf,"quit")) {
+    } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
       free( buf );
       break;
@@ -198,7 +198,7 @@ int main( int argc, char **argv ) {
                         "'connect'.\n\n"
         "      disconnect\n"
 	"                Disconnect from a " + piac::daemon_executable() + "\n\n"
-        "      exit, quit\n"
+        "      exit, quit, q\n"
         "                Exit\n\n"
         "      help\n"
         "                This help message\n\n"
