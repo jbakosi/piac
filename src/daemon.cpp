@@ -100,12 +100,13 @@ void try_bind( zmqpp::socket& sock, int& port, int range ) {
 }
 
 // *****************************************************************************
-void server_thread( void* _ctx, const std::string& db_name, int server_port ) {
+void server_thread( zmqpp::context& ctx,
+                    const std::string& db_name,
+                    int server_port )
+{
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  zmqpp::context* ctx = (zmqpp::context*)_ctx;
-  // construct a REP (reply) socket and bind to interface
-  zmqpp::socket client( *ctx, zmqpp::socket_type::rep );
+  zmqpp::socket client( ctx, zmqpp::socket_type::rep );
   try_bind( client, server_port, 10 );
   NLOG(INFO) << "Server bound to port " << server_port;
   // listen for messages
@@ -150,12 +151,10 @@ void receive_peer( zmqpp::context& ctx, zmqpp::message& request )
 }
 
 // *****************************************************************************
-void peer_recv_thread( void* _ctx ) {
+void peer_recv_thread( zmqpp::context& ctx ) {
   el::Helpers::setThreadName( "rpc-recv" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  zmqpp::context* ctx = (zmqpp::context*)_ctx;
-  // construct a ROUTER socket and bind to interface, will recv from peers
-  zmqpp::socket peers( *ctx, zmqpp::socket_type::router );
+  zmqpp::socket peers( ctx, zmqpp::socket_type::router );
   {
     std::lock_guard lock( g_rpc_mtx );
     try_bind( peers, g_rpc_port, 10 );
@@ -171,23 +170,22 @@ void peer_recv_thread( void* _ctx ) {
       if (poller.has_input( peers )) {
         zmqpp::message request;
         peers.receive( request );
-        receive_peer( *ctx, request );
+        receive_peer( ctx, request );
       }
     }
   }
 }
 
 // *****************************************************************************
-void peer_send_thread( void* _ctx ) {
+void peer_send_thread( zmqpp::context& ctx ) {
   el::Helpers::setThreadName( "rpc-send" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  zmqpp::context* ctx = (zmqpp::context*)_ctx;
   {
     std::unique_lock lock( g_rpc_mtx );
     g_rpc_cv.wait( lock, []{ return g_rpc_set; } );
   }
   // connect to peers
-  for (const auto& addr : my_peers) peer_connect( *ctx, addr );
+  for (const auto& addr : my_peers) peer_connect( ctx, addr );
 }
 
 // *****************************************************************************
@@ -347,10 +345,10 @@ int main( int argc, char **argv ) {
 
   // start threads
   std::vector< std::thread > threads;
-  threads.emplace_back( server_thread, (void*)&ctx, db_name, server_port );
+  threads.emplace_back( server_thread, std::ref(ctx), db_name, server_port );
   threads.emplace_back( database_thread, db_name, input_filename );
-  threads.emplace_back( peer_recv_thread, (void*)&ctx );
-  threads.emplace_back( peer_send_thread, (void*)&ctx );
+  threads.emplace_back( peer_recv_thread, std::ref(ctx) );
+  threads.emplace_back( peer_send_thread, std::ref(ctx) );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();
