@@ -1,8 +1,6 @@
 #include <vector>
 #include <iostream>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <zmqpp/zmqpp.hpp>
 #include <getopt.h>
 #include <unistd.h>
@@ -10,11 +8,6 @@
 #include "logging.hpp"
 #include "project_config.hpp"
 #include "db.hpp"
-
-int g_rpc_port = 65090;
-std::mutex g_rpc_mtx;
-std::condition_variable g_rpc_cv;
-bool g_rpc_set = false;
 
 bool use_strict_ports = false;
 std::unordered_set< std::string > my_peers;
@@ -61,8 +54,7 @@ void dispatch_query( const std::string& db_name,
 }
 
 // *****************************************************************************
-void database_thread( const std::string& db_name,
-                      const std::string& input_filename )
+void db_thread( const std::string& db_name, const std::string& input_filename )
 {
   el::Helpers::setThreadName( "db" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
@@ -119,21 +111,20 @@ void server_thread( zmqpp::context& ctx,
 }
 
 // *****************************************************************************
-void peer_connect( zmqpp::context& ctx, const std::string& addr )
+void peer_connect( zmqpp::context& ctx, const std::string& addr, int rpc_port )
 {
   if (my_connected_peers.find( addr ) != end(my_connected_peers)) return;
-  // construct a DEALER socket, will send to peers
   zmqpp::socket peers( ctx, zmqpp::socket_type::dealer );
   peers.connect( "tcp://" + addr );
   my_connected_peers.insert( addr );
   NLOG(DEBUG) << "Connecting to peer at " + addr;
   zmqpp::message msg;
-  msg << "ADD" << "localhost:" + std::to_string( g_rpc_port );
+  msg << "ADD" << "localhost:" + std::to_string( rpc_port );
   peers.send( msg );
 }
 
 // *****************************************************************************
-void receive_peer( zmqpp::context& ctx, zmqpp::message& request )
+void receive_peer( zmqpp::context& ctx, zmqpp::message& request, int rpc_port )
 {
   std::string id, cmd, addr;
   request >> id >> cmd;
@@ -142,7 +133,7 @@ void receive_peer( zmqpp::context& ctx, zmqpp::message& request )
     NLOG(DEBUG) << "Daemon recv msg: " << "ADD " << addr;
     my_peers.insert( addr );
     NLOG(DEBUG) << "Number of peers: " << my_peers.size();
-    peer_connect( ctx, addr );
+    peer_connect( ctx, addr, rpc_port );
   } else if (cmd == "REM") {
     request >> addr;
     NLOG(DEBUG) << "Daemon recv msg: " << "REM " << addr;
@@ -151,17 +142,14 @@ void receive_peer( zmqpp::context& ctx, zmqpp::message& request )
 }
 
 // *****************************************************************************
-void peer_recv_thread( zmqpp::context& ctx ) {
-  el::Helpers::setThreadName( "rpc-recv" );
+void rpc_thread( zmqpp::context& ctx, int rpc_port ) {
+  el::Helpers::setThreadName( "rpc" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
   zmqpp::socket peers( ctx, zmqpp::socket_type::router );
-  {
-    std::lock_guard lock( g_rpc_mtx );
-    try_bind( peers, g_rpc_port, 10 );
-    g_rpc_set = true;
-    g_rpc_cv.notify_one();
-  }
-  NLOG(INFO) << "Daemon bound to RPC port " << g_rpc_port;
+  try_bind( peers, rpc_port, 10 );
+  NLOG(INFO) << "Daemon bound to RPC port " << rpc_port;
+  // initially connect to peers
+  for (const auto& addr : my_peers) peer_connect( ctx, addr, rpc_port );
   // listen for messages
   zmqpp::poller poller;
   poller.add( peers );
@@ -170,22 +158,10 @@ void peer_recv_thread( zmqpp::context& ctx ) {
       if (poller.has_input( peers )) {
         zmqpp::message request;
         peers.receive( request );
-        receive_peer( ctx, request );
+        receive_peer( ctx, request, rpc_port );
       }
     }
   }
-}
-
-// *****************************************************************************
-void peer_send_thread( zmqpp::context& ctx ) {
-  el::Helpers::setThreadName( "rpc-send" );
-  NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  {
-    std::unique_lock lock( g_rpc_mtx );
-    g_rpc_cv.wait( lock, []{ return g_rpc_set; } );
-  }
-  // connect to peers
-  for (const auto& addr : my_peers) peer_connect( ctx, addr );
 }
 
 // *****************************************************************************
@@ -197,6 +173,7 @@ int main( int argc, char **argv ) {
 
   // Defaults
   int server_port = 55090;
+  int rpc_port = 65090;
   std::string db_name( "piac.db" );
   std::string input_filename;
   std::string logfile = piac::daemon_executable() + ".log";
@@ -246,7 +223,7 @@ int main( int argc, char **argv ) {
                   + std::to_string( server_port ) + "\n\n"
           "  -r, --rpc-port <port>\n"
           "         Listen on RPC port given, default: "
-                  + std::to_string( g_rpc_port ) + "\n\n"
+                  + std::to_string( rpc_port ) + "\n\n"
           "  -v, --version\n"
           "         Show version information\n";
         return EXIT_SUCCESS;
@@ -265,7 +242,7 @@ int main( int argc, char **argv ) {
         break;
 
       case 'r':
-        g_rpc_port = atoi( optarg );
+        rpc_port = atoi( optarg );
         use_strict_ports = true;
         break;
 
@@ -346,9 +323,8 @@ int main( int argc, char **argv ) {
   // start threads
   std::vector< std::thread > threads;
   threads.emplace_back( server_thread, std::ref(ctx), db_name, server_port );
-  threads.emplace_back( database_thread, db_name, input_filename );
-  threads.emplace_back( peer_recv_thread, std::ref(ctx) );
-  threads.emplace_back( peer_send_thread, std::ref(ctx) );
+  threads.emplace_back( db_thread, db_name, input_filename );
+  threads.emplace_back( rpc_thread, std::ref(ctx), rpc_port );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();
