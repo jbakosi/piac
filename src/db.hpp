@@ -171,7 +171,7 @@ index_db( const std::string& db_name, const std::string& input_filename );
 
 std::string db_query( const std::string& db_name, std::string&& query_string );
 
-std::string db_list_hash( const std::string& db_name );
+std::vector< std::string > db_list_hash( const std::string& db_name );
 
 std::string db_add( const std::string& db_name, std::string&& cmd_string );
 

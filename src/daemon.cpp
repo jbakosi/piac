@@ -56,19 +56,19 @@ void dispatch_query(
 }
 
 // *****************************************************************************
-void db_thread( const std::string& db_name, const std::string& input_filename )
+void db_thread( const std::string& db_name,
+                const std::string& input_filename,
+                std::unordered_set< std::string >& my_hashes )
 {
   el::Helpers::setThreadName( "db" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
   NLOG(INFO) << "Using database: " << db_name;
 
+  // initially optionally populate database
   if (input_filename.empty()) {
-
     auto ndoc = piac::get_doccount( db_name );
     NLOG(INFO) << "Number of documents: " << ndoc;
-
   } else {
-
     std::ifstream f( input_filename );
     if (not f.good()) {
       NLOG(ERROR) << "Database input file does not exist: " << input_filename;
@@ -76,8 +76,12 @@ void db_thread( const std::string& db_name, const std::string& input_filename )
       NLOG(INFO) << "Populating database using: " << input_filename;
       piac::index_db( db_name, input_filename );
     }
-
   }
+
+  // initially query hashes of db entries
+  auto hashes = piac::db_list_hash( db_name );
+  for (auto&& h : hashes) my_hashes.insert( std::move(h) );
+  NLOG(DEBUG) << "Initial number of db hashes: " << my_hashes.size();
 }
 
 // *****************************************************************************
@@ -388,13 +392,17 @@ int main( int argc, char **argv ) {
   for (const auto& p : peers)
     my_peers.emplace( p, zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
 
+  // will store db entry hashes
+  std::unordered_set< std::string > my_hashes;
+
   // start threads
   std::vector< std::thread > threads;
   threads.emplace_back( server_thread, std::ref(ctx), std::ref(my_peers),
                         db_name, server_port, use_strict_ports );
   threads.emplace_back( rpc_thread, std::ref(ctx), std::ref(my_peers),
                         default_rpc_port, rpc_port, use_strict_ports );
-  threads.emplace_back( db_thread, db_name, input_filename );
+  threads.emplace_back( db_thread, db_name, input_filename,
+                        std::ref(my_hashes) );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();

@@ -1,3 +1,5 @@
+#include <string>
+
 #include <cryptopp/sha.h>
 #include <cryptopp/files.h>
 #include <cryptopp/hex.h>
@@ -30,7 +32,7 @@ piac::get_doccount( const std::string db_name ) {
     Xapian::Database db( db_name );
     return db.get_doccount();
   } catch ( const Xapian::Error &e ) {
-    NLOG(ERROR) << e.get_description();
+    NLOG(WARNING) << e.get_description();
   }
   return {};
 }
@@ -166,27 +168,26 @@ piac::db_query( const std::string& db_name, std::string&& cmd ) {
 }
 
 // *****************************************************************************
-std::string
+std::vector< std::string >
 piac::db_list_hash( const std::string& db_name ) {
+  std::vector< std::string > hashes;
   try {
 
     Xapian::Database db( db_name );
     Xapian::doccount dbsize = db.get_doccount();
-
-    std::stringstream result;
-    result << "Number of documents: " << dbsize;
-    if (dbsize == 0) return result.str();
+    if (dbsize == 0) return {};
 
     for (auto it = db.postlist_begin({}); it != db.postlist_end({}); ++it) {
       auto entry = db.get_document( *it ).get_data();
-      result << '\n' << sha256( entry );
+      hashes.emplace_back( sha256( entry ) );
     }
-    return result.str();
 
   } catch ( const Xapian::Error &e ) {
-    NLOG(ERROR) << e.get_description();
+    if ( e.get_description().find( "No such file" ) == std::string::npos)
+      NLOG(ERROR) << e.get_description();
   }
-  return {};
+
+  return hashes;
 }
 
 // *****************************************************************************
@@ -208,7 +209,12 @@ piac::db_list( const std::string& db_name, std::string&& cmd ) {
   NLOG(DEBUG) << "db list: '" << cmd << "'";
   if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
     cmd.erase( 0, 5 );
-    return db_list_hash( db_name );
+    auto hashes = db_list_hash( db_name );
+    std::string result( "Number of documents: " +
+                        std::to_string( hashes.size() ) + '\n' );
+    for (auto&& h : hashes) result += std::move(h) + '\n';
+    result.pop_back();
+    return result;
   }
   return {};
 }
