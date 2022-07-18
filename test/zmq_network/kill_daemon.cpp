@@ -5,7 +5,7 @@
 int main( int argc, char** argv )
 {
   if (argc != 2) {
-    std::cout << "Usage: " << argv[0] << " <piac-daemon-filename.log>\n";
+    std::cout << "Usage: " << argv[0] << " <filename.log>\n";
     return EXIT_FAILURE;
   }
 

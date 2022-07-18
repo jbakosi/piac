@@ -9,14 +9,12 @@
 #include "project_config.hpp"
 #include "db.hpp"
 
-bool use_strict_ports = false;
-std::unordered_set< std::string > my_peers;
-std::unordered_set< std::string > my_connected_peers;
-
 // *****************************************************************************
-void dispatch_query( const std::string& db_name,
-                     zmqpp::socket& client,
-                     std::string&& q )
+void dispatch_query(
+  const std::string& db_name,
+  zmqpp::socket& client,
+  const std::unordered_map< std::string, zmqpp::socket >& my_peers,
+  std::string&& q )
 {
   NLOG(DEBUG) << "Interpreting message: '" << q << "'";
 
@@ -42,7 +40,7 @@ void dispatch_query( const std::string& db_name,
   } else if (q == "peers") {
 
     std::stringstream peers_list;
-    for (const auto& p : my_peers) peers_list << p << ' ';
+    for (const auto& [addr,sock] : my_peers) peers_list << addr << ' ';
     client.send( peers_list.str() );
 
   } else {
@@ -75,7 +73,9 @@ void db_thread( const std::string& db_name, const std::string& input_filename )
 
 
 // *****************************************************************************
-void try_bind( zmqpp::socket& sock, int& port, int range ) {
+void
+try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
+{
   if (use_strict_ports) {
     sock.bind( "tcp://*:" + std::to_string(port) );
     return;
@@ -92,75 +92,114 @@ void try_bind( zmqpp::socket& sock, int& port, int range ) {
 }
 
 // *****************************************************************************
-void server_thread( zmqpp::context& ctx,
-                    const std::string& db_name,
-                    int server_port )
+void
+server_thread( zmqpp::context& ctx,
+               const std::unordered_map< std::string, zmqpp::socket >& my_peers,
+               const std::string& db_name,
+               int server_port,
+               bool use_strict_ports )
 {
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
   zmqpp::socket client( ctx, zmqpp::socket_type::rep );
-  try_bind( client, server_port, 10 );
+  try_bind( client, server_port, 10, use_strict_ports );
   NLOG(INFO) << "Server bound to port " << server_port;
   // listen for messages
   while (not g_interrupted) {
     std::string request;
     auto res = client.receive( request );
     NLOG(DEBUG) << "Server received message: '" << request << "'";
-    dispatch_query( db_name, client, std::move(request) );
+    dispatch_query( db_name, client, my_peers, std::move(request) );
   }
 }
 
 // *****************************************************************************
-void peer_connect( zmqpp::context& ctx, const std::string& addr, int rpc_port )
-{
-  if (my_connected_peers.find( addr ) != end(my_connected_peers)) return;
-  zmqpp::socket peers( ctx, zmqpp::socket_type::dealer );
-  peers.connect( "tcp://" + addr );
-  my_connected_peers.insert( addr );
+zmqpp::socket
+connect( zmqpp::context& ctx, const std::string& addr, int rpc_port ) {
+  zmqpp::socket dealer( ctx, zmqpp::socket_type::dealer );
+  dealer.connect( "tcp://" + addr );
   NLOG(DEBUG) << "Connecting to peer at " + addr;
-  zmqpp::message msg;
-  msg << "ADD" << "localhost:" + std::to_string( rpc_port );
-  peers.send( msg );
+  return dealer;
 }
 
 // *****************************************************************************
-void receive_peer( zmqpp::context& ctx, zmqpp::message& request, int rpc_port )
+void bcast( int rpc_port,
+            std::unordered_map< std::string, zmqpp::socket >& my_peers )
 {
-  std::string id, cmd, addr;
-  request >> id >> cmd;
-  if (cmd == "ADD") {
-    request >> addr;
-    NLOG(DEBUG) << "Daemon recv msg: " << "ADD " << addr;
-    my_peers.insert( addr );
-    NLOG(DEBUG) << "Number of peers: " << my_peers.size();
-    peer_connect( ctx, addr, rpc_port );
-  } else if (cmd == "REM") {
-    request >> addr;
-    NLOG(DEBUG) << "Daemon recv msg: " << "REM " << addr;
-    my_peers.erase( addr );
+  for (auto& [addr,sock] : my_peers) {
+    zmqpp::message msg;
+    msg << "PEERS";
+    msg << std::to_string( my_peers.size() + 1 );
+    msg << "localhost:" + std::to_string(rpc_port);
+    for (const auto& [taddr,sock] : my_peers) msg << taddr;
+    sock.send( msg );
   }
 }
 
 // *****************************************************************************
-void rpc_thread( zmqpp::context& ctx, int rpc_port ) {
-  el::Helpers::setThreadName( "rpc" );
-  NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  zmqpp::socket peers( ctx, zmqpp::socket_type::router );
-  try_bind( peers, rpc_port, 10 );
-  NLOG(INFO) << "Daemon bound to RPC port " << rpc_port;
-  // initially connect to peers
-  for (const auto& addr : my_peers) peer_connect( ctx, addr, rpc_port );
-  // listen for messages
-  zmqpp::poller poller;
-  poller.add( peers );
-  while (not g_interrupted) {
-    if (poller.poll()) {
-      if (poller.has_input( peers )) {
-        zmqpp::message request;
-        peers.receive( request );
-        receive_peer( ctx, request, rpc_port );
+bool
+answer( zmqpp::context& ctx,
+        zmqpp::message& request,
+        std::unordered_map< std::string, zmqpp::socket >& my_peers,
+        int rpc_port ) {
+  std::string id, cmd;
+  request >> id >> cmd;
+
+  bool new_peers = false;
+  if (cmd == "PEERS") {
+    std::string size;
+    request >> size;
+    std::size_t num = stoul( size );
+    NLOG(DEBUG) << "Daemon recv msg: PEERS ";
+    while (num-- != 0) {
+      std::string addr;
+      request >> addr;
+      if (addr != "localhost:" + std::to_string(rpc_port) &&
+          my_peers.find(addr) == end(my_peers))
+      {
+        my_peers.emplace( addr, connect( ctx, addr, rpc_port ) );
+        new_peers = true;
       }
     }
+    NLOG(DEBUG) << "Number of peers: " << my_peers.size();
+  }
+
+  return new_peers;
+}
+
+// *****************************************************************************
+void rpc_thread( zmqpp::context& ctx,
+                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
+                 int rpc_port, bool use_strict_ports ) {
+  el::Helpers::setThreadName( "rpc" );
+  NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
+  zmqpp::socket router( ctx, zmqpp::socket_type::router );
+  try_bind( router, rpc_port, 10, use_strict_ports );
+  NLOG(INFO) << "Daemon bound to RPC port " << rpc_port;
+  // remove our address from peer list
+  my_peers.erase( "localhost:" + std::to_string(rpc_port) );
+  // initially connect to peers
+  for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, rpc_port );
+  NLOG(DEBUG) << "Initial number of peers: " << my_peers.size();
+  // listen to peers
+  zmqpp::poller poller;
+  poller.add( router );
+  bool to_bcast = true;
+  while (not g_interrupted) {
+    // broadcast to new peers
+    if (to_bcast) {
+      bcast( rpc_port, my_peers );
+      to_bcast = false;
+    }
+    // listen to peers
+    if (poller.poll(500)) {
+      if (poller.has_input( router )) {
+        zmqpp::message request;
+        router.receive( request );
+        to_bcast = answer( ctx, request, my_peers, rpc_port );
+      }
+    }
+
   }
 }
 
@@ -168,20 +207,59 @@ void rpc_thread( zmqpp::context& ctx, int rpc_port ) {
 // piac daemon main
 int main( int argc, char **argv ) {
 
+  int detach = 0;
+  std::vector< std::string > args( argv, argv+argc );
+  for (std::size_t i=1; i<args.size(); ++i)
+    if (args[i] == "--detach")
+      detach = 1;
+
+  if (detach) {
+
+    // Fork the current process. The parent process continues with a process ID
+    // greater than 0.  A process ID lower than 0 indicates a failure in either
+    // process.
+    pid_t pid = fork();
+    if (pid > 0) {
+      std::cout << "Running in daemon mode. Forked PID: " << pid
+                << ". See the log file for details." << std::endl;
+      return EXIT_SUCCESS;
+    } else if (pid < 0) {
+      return EXIT_FAILURE;
+    }
+
+    // Generate a session ID for the child process and ensure it is valid.
+    if (setsid() < 0) {
+      // Log failure and exit
+      std::cerr << "Could not generate session ID for child process\n";
+      // If a new session ID could not be generated, we must terminate the child
+      // process or it will be orphaned.
+      return EXIT_FAILURE;
+    }
+
+    // A daemon cannot use the terminal, so close standard file descriptors for
+    // security reasons and also because ctest hangs in daemon mode waiting for
+    // stdout and stderr to be closed.
+    close( STDIN_FILENO );
+    close( STDOUT_FILENO );
+    close( STDERR_FILENO );
+
+  }
+
   std::string version( "piac: " + piac::daemon_executable() + " v"
                        + piac::project_version() + "-" + piac::build_type() );
 
   // Defaults
   int server_port = 55090;
   int rpc_port = 65090;
+  bool use_strict_ports = false;
   std::string db_name( "piac.db" );
   std::string input_filename;
   std::string logfile = piac::daemon_executable() + ".log";
+  std::vector< std::string > peers;
 
   // Process command line arguments
   int c;
   int option_index = 0;
-  int detach = 0;
   static struct option long_options[] =
     { // NAME      ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
       {"db",       required_argument, 0,       'd'},
@@ -233,7 +311,7 @@ int main( int argc, char **argv ) {
         break;
 
       case 'e':
-        my_peers.insert( optarg );
+        peers.push_back( optarg );
         break;
 
       case 'p':
@@ -279,52 +357,23 @@ int main( int argc, char **argv ) {
     "You can use " + piac::cli_executable() + " to interact with it.\n";
 
   NLOG(INFO) << "Logging to " << logfile;
-
-  if (detach) {
-
-    NLOG(INFO) << "Running in daemon mode";
-
-    // Fork the current process. The parent process continues with a process ID
-    // greater than 0.  A process ID lower than 0 indicates a failure in either
-    // process.
-    pid_t pid = fork();
-    if (pid > 0) {
-      NLOG(INFO) << "Forked PID: " << pid;
-      return EXIT_SUCCESS;
-    } else if (pid < 0) {
-      return EXIT_FAILURE;
-    }
-
-    // Generate a session ID for the child process and ensure it is valid.
-    if(setsid() < 0) {
-      // Log failure and exit
-      std::cerr << "Could not generate session ID for child process\n";
-      // If a new session ID could not be generated, we must terminate the child
-      // process or it will be orphaned.
-      return EXIT_FAILURE;
-    }
-
-    // A daemon cannot use the terminal, so close standard file descriptors for
-    // security reasons and also because ctest hangs in daemon mode waiting for
-    // stdout and stderr to be closed.
-    close( STDIN_FILENO );
-    close( STDOUT_FILENO );
-    close( STDERR_FILENO );
-
-  } else {
-
-    NLOG(INFO) << "Running in standalone mode";
-
-  }
+  if (detach) NLOG(INFO) << "Forked PID: " << getpid();
 
   // initialize (thread-safe) zmq context
   zmqpp::context ctx;
 
+  // add initial peers
+  std::unordered_map< std::string, zmqpp::socket > my_peers;
+  for (const auto& p : peers)
+    my_peers.emplace( p, zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
+
   // start threads
   std::vector< std::thread > threads;
-  threads.emplace_back( server_thread, std::ref(ctx), db_name, server_port );
+  threads.emplace_back( server_thread, std::ref(ctx), std::ref(my_peers),
+                        db_name, server_port, use_strict_ports );
+  threads.emplace_back( rpc_thread, std::ref(ctx), std::ref(my_peers), rpc_port,
+                        use_strict_ports );
   threads.emplace_back( db_thread, db_name, input_filename );
-  threads.emplace_back( rpc_thread, std::ref(ctx), rpc_port );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();
