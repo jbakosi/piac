@@ -57,17 +57,22 @@ void db_thread( const std::string& db_name, const std::string& input_filename )
   el::Helpers::setThreadName( "db" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
   NLOG(INFO) << "Using database: " << db_name;
+
   if (input_filename.empty()) {
+
     auto ndoc = piac::get_doccount( db_name );
     NLOG(INFO) << "Number of documents: " << ndoc;
+
   } else {
+
     std::ifstream f( input_filename );
     if (not f.good()) {
       NLOG(ERROR) << "Database input file does not exist: " << input_filename;
     } else {
       NLOG(INFO) << "Populating database using: " << input_filename;
       piac::index_db( db_name, input_filename );
-   }
+    }
+
   }
 }
 
@@ -101,9 +106,11 @@ server_thread( zmqpp::context& ctx,
 {
   el::Helpers::setThreadName( "server" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
+
   zmqpp::socket client( ctx, zmqpp::socket_type::rep );
   try_bind( client, server_port, 10, use_strict_ports );
   NLOG(INFO) << "Server bound to port " << server_port;
+
   // listen for messages
   while (not g_interrupted) {
     std::string request;
@@ -141,7 +148,8 @@ bool
 answer( zmqpp::context& ctx,
         zmqpp::message& request,
         std::unordered_map< std::string, zmqpp::socket >& my_peers,
-        int rpc_port ) {
+        int rpc_port )
+{
   std::string id, cmd;
   request >> id >> cmd;
 
@@ -170,17 +178,27 @@ answer( zmqpp::context& ctx,
 // *****************************************************************************
 void rpc_thread( zmqpp::context& ctx,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
-                 int rpc_port, bool use_strict_ports ) {
+                 int default_rpc_port,
+                 int rpc_port,
+                 bool use_strict_ports )
+{
   el::Helpers::setThreadName( "rpc" );
   NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
+
   zmqpp::socket router( ctx, zmqpp::socket_type::router );
   try_bind( router, rpc_port, 10, use_strict_ports );
   NLOG(INFO) << "Daemon bound to RPC port " << rpc_port;
+
   // remove our address from peer list
   my_peers.erase( "localhost:" + std::to_string(rpc_port) );
+  // add default peer
+  for (int p = default_rpc_port; p < rpc_port; ++p)
+    my_peers.emplace( "localhost:" + std::to_string( p ),
+                      zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
   // initially connect to peers
   for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, rpc_port );
   NLOG(DEBUG) << "Initial number of peers: " << my_peers.size();
+
   // listen to peers
   zmqpp::poller poller;
   poller.add( router );
@@ -199,7 +217,6 @@ void rpc_thread( zmqpp::context& ctx,
         to_bcast = answer( ctx, request, my_peers, rpc_port );
       }
     }
-
   }
 }
 
@@ -250,7 +267,8 @@ int main( int argc, char **argv ) {
 
   // Defaults
   int server_port = 55090;
-  int rpc_port = 65090;
+  int default_rpc_port = 65090;
+  int rpc_port = default_rpc_port;
   bool use_strict_ports = false;
   std::string db_name( "piac.db" );
   std::string input_filename;
@@ -371,8 +389,8 @@ int main( int argc, char **argv ) {
   std::vector< std::thread > threads;
   threads.emplace_back( server_thread, std::ref(ctx), std::ref(my_peers),
                         db_name, server_port, use_strict_ports );
-  threads.emplace_back( rpc_thread, std::ref(ctx), std::ref(my_peers), rpc_port,
-                        use_strict_ports );
+  threads.emplace_back( rpc_thread, std::ref(ctx), std::ref(my_peers),
+                        default_rpc_port, rpc_port, use_strict_ports );
   threads.emplace_back( db_thread, db_name, input_filename );
 
   // wait for all threads to finish
