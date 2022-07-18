@@ -1,6 +1,9 @@
 #include <vector>
 #include <iostream>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+
 #include <zmqpp/zmqpp.hpp>
 #include <getopt.h>
 #include <unistd.h>
@@ -8,6 +11,10 @@
 #include "logging.hpp"
 #include "project_config.hpp"
 #include "db.hpp"
+
+std::mutex g_hashes_mtx;
+std::condition_variable g_hashes_cv;
+bool g_hashes_access = false;
 
 // *****************************************************************************
 void dispatch_query(
@@ -78,10 +85,14 @@ void db_thread( const std::string& db_name,
     }
   }
 
-  // initially query hashes of db entries
-  auto hashes = piac::db_list_hash( db_name );
-  for (auto&& h : hashes) my_hashes.insert( std::move(h) );
-  NLOG(DEBUG) << "Initial number of db hashes: " << my_hashes.size();
+  { // initially query hashes of db entries
+    auto hashes = piac::db_list_hash( db_name );
+    std::lock_guard lock( g_hashes_mtx );
+    g_hashes_access = false;
+    for (auto&& h : hashes) my_hashes.insert( std::move(h) );
+    g_hashes_access = true;
+    g_hashes_cv.notify_one();
+  }
 }
 
 // *****************************************************************************
@@ -137,8 +148,8 @@ connect( zmqpp::context& ctx, const std::string& addr, int rpc_port ) {
 }
 
 // *****************************************************************************
-void bcast( int rpc_port,
-            std::unordered_map< std::string, zmqpp::socket >& my_peers )
+void bcast_peers( int rpc_port,
+                  std::unordered_map< std::string, zmqpp::socket >& my_peers )
 {
   for (auto& [addr,sock] : my_peers) {
     zmqpp::message msg;
@@ -185,6 +196,7 @@ answer( zmqpp::context& ctx,
 // *****************************************************************************
 void rpc_thread( zmqpp::context& ctx,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
+                 const std::unordered_set< std::string >& my_hashes,
                  int default_rpc_port,
                  int rpc_port,
                  bool use_strict_ports )
@@ -206,22 +218,28 @@ void rpc_thread( zmqpp::context& ctx,
   for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, rpc_port );
   NLOG(DEBUG) << "Initial number of peers: " << my_peers.size();
 
+  { // log initial number of hashes (populated by db thread)
+    std::unique_lock lock( g_hashes_mtx );
+    g_hashes_cv.wait( lock, []{ return g_hashes_access; } );
+    NLOG(DEBUG) << "Initial number of db hashes: " << my_hashes.size();
+  }
+
   // listen to peers
   zmqpp::poller poller;
   poller.add( router );
-  bool to_bcast = true;
+  bool to_bcast_peers = true;
   while (not g_interrupted) {
     // broadcast to new peers
-    if (to_bcast) {
-      bcast( rpc_port, my_peers );
-      to_bcast = false;
+    if (to_bcast_peers) {
+      bcast_peers( rpc_port, my_peers );
+      to_bcast_peers = false;
     }
     // listen to peers
     if (poller.poll(500)) {
       if (poller.has_input( router )) {
         zmqpp::message request;
         router.receive( request );
-        to_bcast = answer( ctx, request, my_peers, rpc_port );
+        to_bcast_peers = answer( ctx, request, my_peers, rpc_port );
       }
     }
   }
@@ -400,7 +418,8 @@ int main( int argc, char **argv ) {
   threads.emplace_back( server_thread, std::ref(ctx), std::ref(my_peers),
                         db_name, server_port, use_strict_ports );
   threads.emplace_back( rpc_thread, std::ref(ctx), std::ref(my_peers),
-                        default_rpc_port, rpc_port, use_strict_ports );
+                        std::ref(my_hashes), default_rpc_port, rpc_port,
+                        use_strict_ports );
   threads.emplace_back( db_thread, db_name, input_filename,
                         std::ref(my_hashes) );
 
