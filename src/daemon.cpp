@@ -28,12 +28,16 @@ void dispatch_query(
 
     q.erase( 0, 3 );
     if (q[0]=='q' && q[1]=='u' && q[2]=='e' && q[3]=='r' && q[4]=='y') {
-      q.erase( 0, 5 );
+      q.erase( 0, 6 );
       auto result = piac::db_query( db_name, std::move(q) );
       client.send( result );
     } else if (q[0]=='a' && q[1]=='d' && q[2]=='d') {
       q.erase( 0, 4 );
       auto result = piac::db_add( db_name, std::move(q) );
+      client.send( result );
+    } else if (q[0]=='l' && q[1]=='i' && q[2]=='s' && q[3]=='t') {
+      q.erase( 0, 5 );
+      auto result = piac::db_list( db_name, std::move(q) );
       client.send( result );
     }
 
@@ -75,7 +79,6 @@ void db_thread( const std::string& db_name, const std::string& input_filename )
 
   }
 }
-
 
 // *****************************************************************************
 void

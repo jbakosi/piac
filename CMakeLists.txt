@@ -98,12 +98,16 @@ add_definitions(-DAUTO_INITIALIZE_EASYLOGGINGPP -DELPP_FEATURE_CRASH_LOG -DELPP_
 # Find RapidJSON
 find_package(RapidJSON REQUIRED)
 
+# Find Crypto++
+find_package(cryptopp REQUIRED)
+
 #### piac
 
 add_library(db ${PIAC_SOURCE_DIR}/db.cpp
                ${PIAC_SOURCE_DIR}/jsonbase.cpp)
 target_include_directories(db PUBLIC ${PIAC_SOURCE_DIR}
-                                     ${RAPIDJSON_INCLUDE_DIRS})
+                                     ${RAPIDJSON_INCLUDE_DIRS}
+                                     ${cryptopp_INCLUDE_DIRS})
 set_target_properties(db PROPERTIES LIBRARY_OUTPUT_NAME piac_db)
 install(TARGETS db
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
@@ -125,7 +129,8 @@ target_link_libraries(${DAEMON_EXECUTABLE}
                       db
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
-                      Threads::Threads)
+                      Threads::Threads
+                      cryptopp::cryptopp)
 install(TARGETS ${DAEMON_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
