@@ -86,7 +86,7 @@ void db_thread( const std::string& db_name,
   }
 
   { // initially query hashes of db entries
-    auto hashes = piac::db_list_hash( db_name );
+    auto hashes = piac::db_list_hash( db_name, /* inhex = */ false );
     std::lock_guard lock( g_hashes_mtx );
     g_hashes_access = false;
     for (auto&& h : hashes) my_hashes.insert( std::move(h) );

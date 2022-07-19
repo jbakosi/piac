@@ -11,18 +11,22 @@
 std::string
 piac::sha256( const std::string& msg ) {
   using namespace CryptoPP;
-
   std::string digest;
   SHA256 hash;
   hash.Update(( const byte*)msg.data(), msg.size() );
   digest.resize( hash.DigestSize() );
   hash.Final( (byte*)&digest[0] );
+  return digest;
+}
 
-  std::string result;
-  HexEncoder encoder( new StringSink( result ) );
+// ****************************************************************************
+std::string
+piac::hex( const std::string& digest ) {
+  using namespace CryptoPP;
+  std::string hex;
+  HexEncoder encoder( new StringSink( hex ) );
   StringSource( digest, true, new Redirector( encoder ) );
-
-  return result;
+  return hex;
 }
 
 // ****************************************************************************
@@ -169,7 +173,7 @@ piac::db_query( const std::string& db_name, std::string&& cmd ) {
 
 // *****************************************************************************
 std::vector< std::string >
-piac::db_list_hash( const std::string& db_name ) {
+piac::db_list_hash( const std::string& db_name, bool inhex ) {
   std::vector< std::string > hashes;
   try {
 
@@ -179,11 +183,12 @@ piac::db_list_hash( const std::string& db_name ) {
 
     for (auto it = db.postlist_begin({}); it != db.postlist_end({}); ++it) {
       auto entry = db.get_document( *it ).get_data();
-      hashes.emplace_back( sha256( entry ) );
+      auto digest = sha256( entry );
+      hashes.emplace_back( inhex ? hex(digest) : digest );
     }
 
   } catch ( const Xapian::Error &e ) {
-    if ( e.get_description().find( "No such file" ) == std::string::npos)
+    if (e.get_description().find("No such file") == std::string::npos)
       NLOG(ERROR) << e.get_description();
   }
 
@@ -209,7 +214,7 @@ piac::db_list( const std::string& db_name, std::string&& cmd ) {
   NLOG(DEBUG) << "db list: '" << cmd << "'";
   if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
     cmd.erase( 0, 5 );
-    auto hashes = db_list_hash( db_name );
+    auto hashes = db_list_hash( db_name, /* inhex = */ true );
     std::string result( "Number of documents: " +
                         std::to_string( hashes.size() ) + '\n' );
     for (auto&& h : hashes) result += std::move(h) + '\n';

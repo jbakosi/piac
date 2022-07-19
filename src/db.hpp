@@ -159,6 +159,8 @@ namespace XapianValues {
 
 std::string sha256( const std::string& msg );
 
+std::string hex( const std::string& digest );
+
 Xapian::doccount get_doccount( const std::string db_name );
 
 std::string
@@ -171,7 +173,8 @@ index_db( const std::string& db_name, const std::string& input_filename );
 
 std::string db_query( const std::string& db_name, std::string&& query_string );
 
-std::vector< std::string > db_list_hash( const std::string& db_name );
+std::vector< std::string >
+db_list_hash( const std::string& db_name, bool inhex );
 
 std::string db_add( const std::string& db_name, std::string&& cmd_string );
 
