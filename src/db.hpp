@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_set>
 
 #include "xapian.h"
 #include "jsonbase.hpp"
@@ -32,8 +33,7 @@ class Document : public JSONBase {
       const override
     {
        writer->StartObject();
-       writer->String( "id" );
-       writer->Int( m_id );
+       writer->String( "id" );        writer->Int( m_id );
        writer->String("title");       writer->String( m_title.c_str() );
        writer->String("author");      writer->String( m_author.c_str() );
        writer->String("description"); writer->String( m_description.c_str() );
@@ -85,6 +85,10 @@ class Document : public JSONBase {
     const std::string& keywords() const { return m_keywords; }
     void keywords( const std::string& t ) { m_keywords = t; }
 
+    // SHA is not serialized, but regenerated when needed
+    const std::string& sha() const { return m_sha; }
+    void sha( const std::string& s ) { m_sha = s; }
+
   private:
     int m_id;
     std::string m_title;
@@ -97,6 +101,7 @@ class Document : public JSONBase {
     std::string m_format;
     std::string m_location;
     std::string m_keywords;
+    std::string m_sha;
 };
 
 class Documents : public JSONBase {
@@ -136,6 +141,7 @@ class Documents : public JSONBase {
     }
 
     const std::vector< Document >& documents() const { return m_documents; }
+    std::vector< Document >& documents() { return m_documents; }
 
     const Document& operator[]( std::size_t i ) const { return m_documents[i]; }
     Document& operator[]( std::size_t i ) {
@@ -152,17 +158,40 @@ namespace XapianValues {
   Xapian::valueno PRICE = 1;
 }
 
+std::string sha256( const std::string& msg );
+
+std::string hex( const std::string& digest );
+
 Xapian::doccount get_doccount( const std::string db_name );
 
-void add_document( Xapian::TermGenerator& indexer,
-                   Xapian::WritableDatabase& db,
-                   const Document& ndoc );
+std::string
+add_document( Xapian::TermGenerator& indexer,
+              Xapian::WritableDatabase& db,
+              Document& ndoc );
 
 std::size_t
-index_db( const std::string& db_name, const std::string& input_filename );
+index_db( const std::string& db_name,
+          const std::string& input_filename,
+          const std::unordered_set< std::string >& my_hashes = {} );
 
-std::string db_query( const std::string& db_name, std::string&& query_string );
+[[nodiscard]] std::string
+db_query( const std::string& db_name, std::string&& query_string );
 
-std::string db_add( const std::string& db_name, std::string&& cmd_string );
+[[nodiscard]] std::vector< std::string >
+db_get_docs( const std::string& db_name,
+             const std::vector< std::string >& hashes );
+
+std::size_t
+db_put_docs( const std::string& db_name,
+             const std::vector< std::string >& docs );
+
+[[nodiscard]] std::vector< std::string >
+db_list_hash( const std::string& db_name, bool inhex );
+
+std::string db_add( const std::string& db_name,
+            std::string&& cmd_string,
+            const std::unordered_set< std::string >& my_hashes = {} );
+
+std::string db_list( const std::string& db_name, std::string&& cmd_string );
 
 } // piac::

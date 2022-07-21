@@ -5,12 +5,17 @@
 int main( int argc, char** argv )
 {
   if (argc != 2) {
-     std::cout << "Usage: " << argv[0] << " <piac-daemon-filename.log>\n";
-     return EXIT_FAILURE;
+    std::cout << "Usage: " << argv[0] << " <filename.log>\n";
+    return EXIT_FAILURE;
   }
 
   // Find last PID in log
   std::ifstream cin( argv[1] );
+  if (not cin.good()) {
+    std::cout << "Cannot open file " << argv[1] << "\n";
+    return EXIT_FAILURE;
+  }
+
   int pid = -1;
   while (not cin.eof()) {
     std::string line;

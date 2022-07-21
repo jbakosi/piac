@@ -1,0 +1,3 @@
+connect localhost:23091
+peers
+exit

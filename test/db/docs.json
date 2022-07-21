@@ -1,0 +1,28 @@
+[
+  {
+    "author": "Joe Schmoe",
+    "title": "Bush Somerset Collection Bookcase",
+    "description": "A long description of Bush Somerset Collection Bookcase",
+    "category": "Furniture",
+    "price": 122.0,
+    "condition": "awesome",
+    "shipping": "pickup, delivery, convert to array",
+    "format": "buy it now",
+    "location": "home",
+    "keywords": "there should be multiple keywords, convert to array",
+    "id": 9
+  },
+  {
+    "author": "Joe Schmoe 2",
+    "title": "Bush Somerset Collection Bookcase 2",
+    "description": "A very long description of Bush Somerset Collection Bookcase",
+    "category": "Furniture",
+    "price": 125.0,
+    "condition": "poor",
+    "shipping": "pickup, delivery, convert to array",
+    "format": "buy it now",
+    "location": "home",
+    "keywords": "there should be multiple keywords, convert to array",
+    "id": 3
+  }
+]
