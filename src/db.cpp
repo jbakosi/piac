@@ -30,6 +30,15 @@ piac::hex( const std::string& digest ) {
 }
 
 // ****************************************************************************
+void trim( std::string& s ) {
+  const std::string WHITESPACE( " \n\r\t\f\v" );
+  auto p = s.find_first_not_of( WHITESPACE );
+  s = p == std::string::npos ? "" : s.substr( p );
+  p = s.find_last_not_of( WHITESPACE );
+  s = p == std::string::npos ? "" : s.substr( 0, p + 1 );
+}
+
+// ****************************************************************************
 Xapian::doccount
 piac::get_doccount( const std::string db_name ) {
   try {
@@ -87,15 +96,17 @@ piac::add_document( Xapian::TermGenerator& indexer,
   // many times we run the indexer
   doc.add_boolean_term( std::to_string( ndoc.id() ) );
   doc.set_data( entry );
-  doc.add_term( sha );
+  doc.add_term( 'Q' + sha );
   // Add Xapian doc to db
-  db.replace_document( sha, doc );
+  db.replace_document( 'Q' + sha, doc );
   return sha;
 }
 
 // ****************************************************************************
 std::size_t
-piac::index_db( const std::string& db_name, const std::string& input_filename )
+piac::index_db( const std::string& db_name,
+                const std::string& input_filename,
+                const std::unordered_set< std::string >& my_hashes )
 {
   if (input_filename.empty()) return 0;
   NLOG(DEBUG) << "Indexing " << input_filename;
@@ -109,16 +120,22 @@ piac::index_db( const std::string& db_name, const std::string& input_filename )
     // Read json db from file
     Documents ndoc;
     ndoc.deserializeFromFile( input_filename );
-    // Insert all documents from json into xapian db
-    for (auto& d : ndoc.documents()) add_document( indexer, db, d );
+    // Insert documents we do not yet have from json into xapian db
+    std::size_t numins = 0;
+    for (auto& d : ndoc.documents()) {
+      auto entry = d.serialize();
+      if (my_hashes.find( sha256( entry ) ) == end(my_hashes)) {
+        add_document( indexer, db, d );
+        ++numins;
+      }
+    }
 
-    NLOG(INFO) << "Finished indexing " << ndoc.documents().size()
-               << " entries, commit to db";
+    NLOG(DEBUG) << "Indexed " << numins << " entries";
     // Explicitly commit so that we get to see any errors. WritableDatabase's
     // destructor will commit implicitly (unless we're in a transaction) but
     // will swallow any exceptions produced.
     db.commit();
-    return ndoc.documents().size();
+    return numins;
 
   } catch ( const Xapian::Error &e ) {
     NLOG(ERROR) << e.get_description();
@@ -162,13 +179,77 @@ piac::db_query( const std::string& db_name, std::string&& cmd ) {
                  << " [" << i.get_document().get_data() << "]\n";
       }
     }
-    NLOG(DEBUG) << "results: " + result.str();
+    //NLOG(DEBUG) << "results: " + result.str();
     return result.str();
 
   } catch ( const Xapian::Error &e ) {
     NLOG(ERROR) << e.get_description();
   }
   return {};
+}
+
+// *****************************************************************************
+std::vector< std::string >
+piac::db_get_docs( const std::string& db_name,
+                   const std::vector< std::string >& hashes )
+{
+  std::vector< std::string > docs;
+  try {
+
+    Xapian::Database db( db_name );
+    Xapian::doccount dbsize = db.get_doccount();
+    if (dbsize == 0) return {};
+
+    for (const auto& h : hashes) {
+      assert( h.size() == 32 );
+      auto p = db.postlist_begin( 'Q' + h );
+      if (p != db.postlist_end( 'Q' + h ))
+        docs.push_back( db.get_document( *p ).get_data() );
+      else
+        NLOG(WARNING) << "Document not found: " << hex(h);
+    }
+
+  } catch ( const Xapian::Error &e ) {
+    if (e.get_description().find("No such file") == std::string::npos)
+      NLOG(ERROR) << e.get_description();
+  }
+
+  return docs;
+}
+
+// *****************************************************************************
+std::size_t
+piac::db_put_docs( const std::string& db_name,
+                   const std::vector< std::string >& docs )
+{
+  try {
+    NLOG(DEBUG) << "Inserting & indexing " << docs.size() << " new entries";
+    Xapian::WritableDatabase db( db_name, Xapian::DB_CREATE_OR_OPEN );
+    Xapian::TermGenerator indexer;
+    Xapian::Stem stemmer( "english" );
+    indexer.set_stemmer( stemmer );
+    indexer.set_stemming_strategy( indexer.STEM_SOME_FULL_POS );
+
+    // Insert all documents into xapian db
+    for (const auto& d : docs) {
+      Document ndoc;
+      ndoc.deserialize( d );
+      add_document( indexer, db, ndoc );
+    }
+
+    NLOG(DEBUG) << "Finished indexing " << docs.size()
+                << " new entries, commit to db";
+    // Explicitly commit so that we get to see any errors. WritableDatabase's
+    // destructor will commit implicitly (unless we're in a transaction) but
+    // will swallow any exceptions produced.
+    db.commit();
+    return docs.size();
+
+  } catch ( const Xapian::Error &e ) {
+    NLOG(ERROR) << e.get_description();
+  }
+
+  return 0;
 }
 
 // *****************************************************************************
@@ -197,13 +278,17 @@ piac::db_list_hash( const std::string& db_name, bool inhex ) {
 
 // *****************************************************************************
 std::string
-piac::db_add( const std::string& db_name, std::string&& cmd ) {
+piac::db_add( const std::string& db_name,
+              std::string&& cmd,
+              const std::unordered_set< std::string >& my_hashes )
+{
   NLOG(DEBUG) << "db add: '" << cmd << "'";
   if (cmd[0]=='j' && cmd[1]=='s' && cmd[2]=='o' && cmd[3]=='n') {
     cmd.erase( 0, 5 );
+    trim( cmd );
     NLOG(DEBUG) << "Add json file: '" << cmd << "' to db";
-    return "Added " + std::to_string( index_db( db_name, cmd.c_str() ) ) +
-           " entries";
+    auto numins = index_db( db_name, cmd, my_hashes );
+    return "Added " + std::to_string( numins ) + " entries";
   }
   return {};
 }

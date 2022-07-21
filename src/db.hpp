@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_set>
 
 #include "xapian.h"
 #include "jsonbase.hpp"
@@ -169,14 +170,27 @@ add_document( Xapian::TermGenerator& indexer,
               Document& ndoc );
 
 std::size_t
-index_db( const std::string& db_name, const std::string& input_filename );
+index_db( const std::string& db_name,
+          const std::string& input_filename,
+          const std::unordered_set< std::string >& my_hashes = {} );
 
-std::string db_query( const std::string& db_name, std::string&& query_string );
+[[nodiscard]] std::string
+db_query( const std::string& db_name, std::string&& query_string );
 
-std::vector< std::string >
+[[nodiscard]] std::vector< std::string >
+db_get_docs( const std::string& db_name,
+             const std::vector< std::string >& hashes );
+
+std::size_t
+db_put_docs( const std::string& db_name,
+             const std::vector< std::string >& docs );
+
+[[nodiscard]] std::vector< std::string >
 db_list_hash( const std::string& db_name, bool inhex );
 
-std::string db_add( const std::string& db_name, std::string&& cmd_string );
+std::string db_add( const std::string& db_name,
+            std::string&& cmd_string,
+            const std::unordered_set< std::string >& my_hashes = {} );
 
 std::string db_list( const std::string& db_name, std::string&& cmd_string );
 

@@ -1,8 +1,5 @@
 # configure database tests
 
-# configure helper executable to generate a random json db entry
-add_executable(rnd_json_entry rnd_json_entry.cpp)
-
 # start daemon in background, run cli tests, kill daemon
 add_test(NAME daemon_db_detach COMMAND ${DAEMON_EXECUTABLE}
          --detach --port 55092 --rpc-port 65092
@@ -19,8 +16,8 @@ set_tests_properties(cli_db_connect PROPERTIES
                      LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/entry.json" _out)
-add_test(NAME generate_rnd_json_entry COMMAND
-  sh -c "$<TARGET_FILE:rnd_json_entry> ${CMAKE_CURRENT_SOURCE_DIR} > ${_out}")
+add_test(NAME generate_rnd_json_entry COMMAND sh -c
+  "$<TARGET_FILE:rnd_json_entry> ${CMAKE_CURRENT_SOURCE_DIR} > ${_out}")
 set_tests_properties(generate_rnd_json_entry PROPERTIES
                      LABELS "db")
 
