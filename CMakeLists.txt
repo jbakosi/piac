@@ -68,14 +68,9 @@ if (NOT TPL_DIR)
   set(TPL_DIR ${ABS_TPL_DIR} CACHE
       STRING "Third-party (external) libraries install directory.")
 endif()
-set(TPL_INCLUDE_DIRS ${TPL_DIR}/include
-                     ${TPL_DIR}/include/common
-                     ${TPL_DIR}/include/utils
-                     ${TPL_DIR}/include/crypto
-                     ${TPL_DIR}/include/storages)
 message(STATUS "Third-party (external) libraries install directory: " ${TPL_DIR})
 
-# Find Monero
+# Find monero
 find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
 
 # Find threads
@@ -91,9 +86,13 @@ find_package(ZMQPP REQUIRED)
 # Find Xapian
 find_package(Xapian REQUIRED)
 
-# Find easylogging++
-find_package(EASYLOGGINGPP REQUIRED)
-add_definitions(-DAUTO_INITIALIZE_EASYLOGGINGPP -DELPP_FEATURE_CRASH_LOG -DELPP_THREAD_SAFE -DELPP_NO_CHECK_MACROS -DELPP_NO_DEBUG_MACROS)
+# Find Boost
+find_package(Boost REQUIRED COMPONENTS filesystem serialization)
+
+# Use monero's easylogging++
+set(EASYLOGGINGPP_LIBRARIES ${TPL_DIR}/lib/libeasylogging.a
+                            ${TPL_DIR}/lib/libepee.a
+                            ${Boost_FILESYSTEM_LIBRARY})
 
 # Find RapidJSON
 find_package(RapidJSON REQUIRED)
@@ -101,34 +100,38 @@ find_package(RapidJSON REQUIRED)
 # Find Crypto++
 find_package(cryptopp REQUIRED)
 
+# Find OpenSSL
+find_package(OpenSSL REQUIRED)
+
 #### piac
 
 add_library(db ${PIAC_SOURCE_DIR}/db.cpp
                ${PIAC_SOURCE_DIR}/jsonbase.cpp)
 target_include_directories(db PUBLIC ${PIAC_SOURCE_DIR}
+                                     ${TPL_DIR}/include
                                      ${RAPIDJSON_INCLUDE_DIRS}
                                      ${cryptopp_INCLUDE_DIRS})
 set_target_properties(db PROPERTIES LIBRARY_OUTPUT_NAME piac_db)
 install(TARGETS db
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development
-)
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
 add_executable(${DAEMON_EXECUTABLE}
                ${CMAKE_BINARY_DIR}/project_config.cpp
-               ${PIAC_SOURCE_DIR}/daemon.cpp
-               ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
+               ${PIAC_SOURCE_DIR}/daemon.cpp)
 target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${TPL_DIR}/include
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
                       db
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
+                      ${EASYLOGGINGPP_LIBRARIES}
                       Threads::Threads
                       cryptopp::cryptopp)
 install(TARGETS ${DAEMON_EXECUTABLE}
@@ -141,15 +144,23 @@ message(STATUS "Target ${DAEMON_EXECUTABLE} configured")
 set(CLI_EXECUTABLE "piac-cli")
 add_executable(${CLI_EXECUTABLE}
                ${CMAKE_BINARY_DIR}/project_config.cpp
-               ${PIAC_SOURCE_DIR}/cli.cpp
-               ${EASYLOGGINGPP_INCLUDE_DIR}/easylogging++.cc)
+               ${PIAC_SOURCE_DIR}/cli.cpp)
 target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
+                           ${TPL_DIR}/include/utils
+                           ${TPL_DIR}/include/common
+                           ${TPL_DIR}/include/crypto
+                           ${TPL_DIR}/include/storages
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       ${ZMQPP_LIBRARIES}
-                      ${Readline_LIBRARY})
+                      ${Readline_LIBRARY}
+                      #${Boost_SERIALIZATION_LIBRARY}
+                      #${OPENSSL_CRYPTO_LIBRARIES}
+                      ${EASYLOGGINGPP_LIBRARIES}
+                      #${MONEROCPP_LIBRARIES}
+                      Threads::Threads)
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime

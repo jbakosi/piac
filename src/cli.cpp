@@ -3,20 +3,23 @@
 #include <readline/readline.h>
 #include <getopt.h>
 
-#include "logging.hpp"
+//#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+//#include "wallet/monero_wallet_full.h"
+
 #include "project_config.hpp"
+#include "logging.hpp"
 
 // *****************************************************************************
 void disconnect( bool& connected,
                  zmqpp::socket& server,
                  const std::string& host )
 {
-  NLOG(DEBUG) << "disconnect";
+  MDEBUG( "disconnect" );
   if (connected) {
     server.disconnect( "tcp://" + host );
-    NLOG(INFO) << "Disconnected";
+    std::cout << "Disconnected\n";
   } else {
-    NLOG(INFO) << "Not connected";
+    std::cout << "Not connected\n";
   }
   connected = false;
 }
@@ -24,39 +27,40 @@ void disconnect( bool& connected,
 // *****************************************************************************
 void connect( bool& connected, zmqpp::socket& server, const std::string& host )
 {
+  MDEBUG( "connect" );
   if (connected) {
-    NLOG(INFO) << "You need to disconnect first";
+    std::cout << "You need to disconnect first\n";
     return;
   }
-  NLOG(DEBUG) << "connect";
-  NLOG(INFO) << "Connecting to " + piac::daemon_executable() << " at " << host;
+  std::cout << "Connecting to " + piac::daemon_executable() << " at " << host
+            << '\n';
   server.connect( "tcp://" + host );
   server.send( "connect" );
   // wait for reply from server
   std::string reply;
   auto res = server.receive( reply );
-  NLOG(DEBUG) << reply;
+  MDEBUG( reply );
   if (reply == "accept") {
-    NLOG(INFO) << "Connected.";
+    std::cout << "Connected\n";
     connected = true;
   }
 }
 
 // *****************************************************************************
 void status( bool connected ) {
-  NLOG(DEBUG) << "status";
+  MDEBUG( "status" );
   if (connected)
-    NLOG(INFO) << "Connected";
+    std::cout << "Connected\n";
   else
-    NLOG(INFO) << "Not connected";
+    std::cout << "Not connected\n";
 }
 
 // *****************************************************************************
 void send_cmd( bool connected, zmqpp::socket& server, const std::string& cmd ) {
-  NLOG(DEBUG) << cmd;
+  MDEBUG( cmd );
   if (not connected) {
-    NLOG(INFO) << "Not connected. Use 'connect' to connect to "
-               << piac::daemon_executable() << '.';
+    std::cout << "Not connected. Use 'connect' to connect to "
+               << piac::daemon_executable() << ".\n";
     return;
   }
   // send message to server with command
@@ -64,7 +68,8 @@ void send_cmd( bool connected, zmqpp::socket& server, const std::string& cmd ) {
   // wait for reply from server
   std::string reply;
   auto res = server.receive( reply );
-  NLOG(INFO) << reply;
+  std::cout << reply << '\n';
+  MDEBUG( reply );
 }
 
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
@@ -81,46 +86,111 @@ std::string color_string( const std::string &s, COLOR color = GRAY ) {
 }
 
 // *****************************************************************************
-int main( int argc, char **argv ) {
-  // Setup logging
-  std::string logfile( piac::cli_executable() + ".log" );
-  setup_logging( piac::cli_executable(), crash_handler, logfile,
-                 /* file_logging = */ true, /* console_logging = */ true );
+void create_new_wallet() {
+//  auto w = monero_wallet_full::create_wallet_random( "", "", monero_network_type::TESTNET );
+//  std::cout << "seed: " << w->get_mnemonic() << '\n';
+}
 
+// *****************************************************************************
+int main( int argc, char **argv ) {
+
+  std::string logfile( piac::cli_executable() + ".log" );
+  std::string log_level( "4" );
   std::string version( "piac: " + piac::cli_executable() + " v"
                        + piac::project_version() + "-"
                        + piac::build_type() );
+  std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
+  std::size_t max_log_files = MAX_LOG_FILES;
 
   // Process command line arguments
   int c;
   int option_index = 0;
+  const int ARG_HELP              = 1000;
+  const int ARG_LOG_FILE          = 1001;
+  const int ARG_LOG_LEVEL         = 1002;
+  const int ARG_MAX_LOG_FILE_SIZE = 1003;
+  const int ARG_MAX_LOG_FILES     = 1004;
+  const int ARG_VERSION           = 1005;
   static struct option long_options[] =
-    { // NAME     ARGUMENT     FLAG SHORTNAME/FLAGVALUE
-      {"help",    no_argument, 0,   'h'},
-      {"version", no_argument, 0,   'v'},
+    { // NAME               ARGUMENT           FLAG SHORTNAME/FLAGVALUE
+      {"help",              no_argument,       0,   ARG_HELP             },
+      {"log-file",          required_argument, 0,   ARG_LOG_FILE         },
+      {"log-level",         required_argument, 0,   ARG_LOG_LEVEL        },
+      {"max-log-file-size", required_argument, 0,   ARG_MAX_LOG_FILE_SIZE},
+      {"max-log-files",     required_argument, 0,   ARG_MAX_LOG_FILES    },
+      {"version",           no_argument,       0,   ARG_VERSION          },
       {0, 0, 0, 0}
     };
-  while ((c = getopt_long(argc, argv, "hv",
-                long_options, &option_index)) != -1)
-  {
+  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
-      case 'h':
-        NLOG(DEBUG) << "help";
-        NLOG(INFO) << "Usage: " + piac::cli_executable() + " [OPTIONS]\n\n"
-                      "OPTIONS\n"
-                      "  -h, --help\n"
-                      "         Show help message.\n\n"
-                      "  -v, --version\n"
-                      "         Show version information\n";
+      case ARG_HELP: {
+        std::cout << version << "\n\n" <<
+          "Usage: " + piac::cli_executable() + " [OPTIONS]\n\n"
+          "OPTIONS\n"
+          "  --help\n"
+          "         Show help message\n\n"
+          "  --log-file <filename.log>\n"
+          "         Specify log filename, default: " + logfile + "\n\n"
+          "  --log-level <[0-4]>\n"
+          "         Specify log level: 0: minimum, 4: maximum\n\n"
+          "  --max-log-file-size <size-in-bytes> \n"
+          "         Specify maximum log file size in bytes. Default: " +
+          std::to_string( MAX_LOG_FILE_SIZE ) + ". Once the log file\n"
+          "         grows past that limit, the next log file is created with "
+                   "a UTC timestamp postfix\n"
+          "         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent "
+                  + piac::cli_executable() + " from managing\n"
+          "         the log files.\n\n"
+          "  --max-log-files <num> \n"
+          "         Specify a limit on the number of log files. Default: " +
+          std::to_string( MAX_LOG_FILES ) + ". The oldest log files\n"
+          "         are removed. In production deployments, you would "
+                   "probably prefer to use\n"
+          "         established solutions like logrotate instead.\n\n"
+          "  --version\n"
+          "         Show version information\n\n";
         return EXIT_SUCCESS;
+      }
 
-      case 'v':
-        NLOG(DEBUG) << "version";
-        NLOG(INFO) << version;
+      case ARG_LOG_FILE: {
+        logfile = optarg;
+        break;
+      }
+
+      case ARG_LOG_LEVEL: {
+        std::stringstream s;
+        s << optarg;
+        int level;
+        s >> level;
+        if (level < 0) level = 0;
+        if (level > 4) level = 4;
+        log_level = std::to_string( level );
+        break;
+      }
+
+      case ARG_MAX_LOG_FILE_SIZE: {
+        std::stringstream s;
+        s << optarg;
+        s >> max_log_file_size;
+        break;
+      }
+
+      case ARG_MAX_LOG_FILES: {
+        std::stringstream s;
+        s << optarg;
+        s >> max_log_files;
+        break;
+      }
+
+      case ARG_VERSION: {
+        std::cout << version << '\n';
         return EXIT_SUCCESS;
+     }
 
-      case '?':
+      default: {
+        std::cout << "See --help.\n";
         return EXIT_FAILURE;
+      }
     }
   }
 
@@ -131,15 +201,15 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
-  NLOG(INFO) << version;
-  std::cout <<
+  std::cout << version << '\n' <<
     "Welcome to piac, where anyone can buy and sell anything privately and\n"
     "securely using the private digital cash, monero. For more information\n"
     "on monero, see https://getmonero.org. This is the command line client\n"
     "of piac. It needs to connect to a " + piac::daemon_executable() + " to "
     "work correctly. Type\n'help' to list the available commands.\n";
 
-  NLOG(INFO) << "Logging to " << logfile;
+  setup_logging( logfile, log_level, /* console_logging = */ false,
+                 max_log_file_size, max_log_files );
 
   std::string host = "localhost:55090";
   bool connected = false;
@@ -202,6 +272,13 @@ int main( int argc, char **argv ) {
         "                Exit\n\n"
         "      help\n"
         "                This help message\n\n"
+        "      new\n"
+        "                Create new user identity. This will generate a new "
+                        "monero wallet\n"
+        "                that will be used to identify you when creating an ad "
+                        "or paying for\n"
+        "                an item. This wallet can be used just like any other "
+                        "monero wallet.\n\n"
         "      peers\n"
         "                List peers of " + piac::daemon_executable() + ". You "
                         "must have connected to a " + piac::daemon_executable()
@@ -211,6 +288,10 @@ int main( int argc, char **argv ) {
 	"                Query status\n\n"
         "      version\n"
 	"                Display " + piac::cli_executable() + " version\n";
+
+    } else if (!strcmp(buf,"new")) {
+
+      create_new_wallet();
 
     } else if (!strcmp(buf,"peers")) {
 
@@ -222,8 +303,7 @@ int main( int argc, char **argv ) {
 
     } else if (!strcmp(buf,"version")) {
 
-      NLOG(DEBUG) << "version";
-      NLOG(INFO) << version;
+      std::cout << version << '\n';
 
     }
 
@@ -234,7 +314,7 @@ int main( int argc, char **argv ) {
   }
 
   disconnect( connected, server, host );
-  NLOG(DEBUG) << "End " << piac::cli_executable() + '\n';
+  MDEBUG( "graceful exit" );
 
   return EXIT_SUCCESS;
 }

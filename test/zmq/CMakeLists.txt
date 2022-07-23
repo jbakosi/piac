@@ -62,13 +62,13 @@ set_tests_properties(daemon_zmq_detach PROPERTIES
                      LABELS "zmq")
 add_test(NAME daemon2_zmq_detach COMMAND ${DAEMON_EXECUTABLE}
          --detach --port 56091 --rpc-port 47091 --peer localhost:65091
-         --log ${DAEMON_EXECUTABLE}.47091.log)
+         --log-file ${DAEMON_EXECUTABLE}.47091.log)
 set_tests_properties(daemon2_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "zmq")
 add_test(NAME daemon3_zmq_detach COMMAND ${DAEMON_EXECUTABLE}
          --detach --port 57091 --rpc-port 37091 --peer localhost:65091
-         --log ${DAEMON_EXECUTABLE}.37091.log)
+         --log-file ${DAEMON_EXECUTABLE}.37091.log)
 set_tests_properties(daemon3_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "zmq")

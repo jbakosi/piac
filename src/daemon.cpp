@@ -8,8 +8,8 @@
 #include <getopt.h>
 #include <unistd.h>
 
-#include "logging.hpp"
 #include "project_config.hpp"
+#include "logging.hpp"
 #include "db.hpp"
 
 std::mutex g_hashes_mtx;
@@ -27,7 +27,7 @@ db_update_hashes( const std::string& db_name,
   for (auto&& h : hashes) my_hashes.insert( std::move(h) );
   g_hashes_access = true;
   g_hashes_cv.notify_one();
-  NLOG(DEBUG) << "Number of db hashes: " << my_hashes.size();
+  MDEBUG( "Number of db hashes: " << my_hashes.size() );
 }
 
 // *****************************************************************************
@@ -41,14 +41,14 @@ void db_client_op(
 {
   std::string cmd;
   msg >> cmd;
-  NLOG(DEBUG) << "Recv msg " << cmd;
+  MDEBUG( "Recv msg " << cmd );
 
   if (cmd == "connect") {
 
     zmqpp::message reply;
     std::string accept( "accept" );
     reply << accept;
-    NLOG(DEBUG) << "Sending reply '" << accept << "'";
+    MDEBUG( "Sending reply '" << accept << "'" );
     client.send( reply );
 
   } else if (cmd[0]=='d' && cmd[1]=='b') {
@@ -66,12 +66,12 @@ void db_client_op(
       q.erase( 0, 4 );
       reply = piac::db_add( db_name, std::move(q), my_hashes );
       auto ndoc = piac::get_doccount( db_name );
-      NLOG(DEBUG) << "Number of documents: " << ndoc;
+      MDEBUG( "Number of documents: " << ndoc );
       db_update_hashes( db_name, my_hashes );
       zmqpp::message note;
       note << "NEW";
       db_rpc.send( note );
-      NLOG(DEBUG) << "Sent note on new documents";
+      MDEBUG( "Sent note on new documents" );
 
     } else if (q[0]=='l' && q[1]=='i' && q[2]=='s' && q[3]=='t') {
 
@@ -91,7 +91,7 @@ void db_client_op(
 
   } else {
 
-    NLOG(ERROR) << "unknown command";
+    MERROR( "unknown command" );
     client.send( "unknown command" );
 
   }
@@ -106,7 +106,7 @@ db_peer_op( const std::string& db_name,
 {
   std::string cmd;
   msg >> cmd;
-  NLOG(DEBUG) << "Recv msg: " << cmd;
+  MDEBUG( "Recv msg: " << cmd );
 
   if (cmd == "GET") {
 
@@ -122,13 +122,13 @@ db_peer_op( const std::string& db_name,
     }
 
     auto docs = piac::db_get_docs( db_name, hashes );
-    NLOG(DEBUG) << "Looked up " << docs.size() << " hashes";
+    MDEBUG( "Looked up " << docs.size() << " hashes" );
 
     zmqpp::message reply;
     reply << "PUT" << addr << std::to_string( docs.size() );
     for (const auto& d : docs) reply << d;
     db_rpc.send( reply );
-    NLOG(DEBUG) << "Sending " << docs.size() << " entries";
+    MDEBUG( "Sending " << docs.size() << " entries" );
 
   } else if (cmd == "INS") {
 
@@ -147,19 +147,19 @@ db_peer_op( const std::string& db_name,
     }
     if (not docs.empty()) {
       piac::db_put_docs( db_name, docs );
-      NLOG(DEBUG) << "Inserted " << docs.size() << " entries to db";
+      MDEBUG(  "Inserted " << docs.size() << " entries to db" );
       auto ndoc = piac::get_doccount( db_name );
-      NLOG(DEBUG) << "Number of documents: " << ndoc;
+      MDEBUG( "Number of documents: " << ndoc );
       db_update_hashes( db_name, my_hashes );
       zmqpp::message reply;
       reply << "NEW";
       db_rpc.send( reply );
-      NLOG(DEBUG) << "Sent note on new documents";
+      MDEBUG( "Sent note on new documents" );
     }
 
   } else {
 
-    NLOG(ERROR) << "unknown cmd";
+    MERROR( "unknown cmd" );
 
   }
 }
@@ -179,8 +179,8 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
     }
     catch ( zmqpp::exception& e ) {}
   } while (++port < port+range );
-  NLOG(ERROR) << "Could not bind to socket within range: ["
-              << port << ',' << port+range << ')';
+  MERROR( "Could not bind to socket within range: ["
+          << port << ',' << port+range << ')' );
 }
 
 // *****************************************************************************
@@ -193,20 +193,20 @@ db_thread( zmqpp::context& ctx,
            const std::unordered_map< std::string, zmqpp::socket >& my_peers,
            std::unordered_set< std::string >& my_hashes )
 {
-  el::Helpers::setThreadName( "db" );
-  NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
-  NLOG(INFO) << "Using database: " << db_name;
+  MLOG_SET_THREAD_NAME( "db" );
+  MINFO( "db thread initialized" );
+  MINFO( "Using database: " << db_name );
 
   // initially optionally populate database
   if (input_filename.empty()) {
     auto ndoc = piac::get_doccount( db_name );
-    NLOG(INFO) << "Initial number of documents: " << ndoc;
+    MINFO( "Initial number of documents: " << ndoc );
   } else {
     std::ifstream f( input_filename );
     if (not f.good()) {
-      NLOG(ERROR) << "Database input file does not exist: " << input_filename;
+      MERROR( "Database input file does not exist: " << input_filename );
     } else {
-      NLOG(INFO) << "Populating database using: " << input_filename;
+      MINFO( "Populating database using: " << input_filename );
       piac::index_db( db_name, input_filename );
     }
   }
@@ -217,17 +217,17 @@ db_thread( zmqpp::context& ctx,
   // create socket that will listen to clients and bind to server port
   zmqpp::socket client( ctx, zmqpp::socket_type::reply );
   try_bind( client, server_port, 10, use_strict_ports );
-  NLOG(INFO) << "Bound to port " << server_port;
+  MINFO( "Bound to port " << server_port );
 
   // create socket that will listen to requests for db lookups from peers
   zmqpp::socket db_rpc( ctx, zmqpp::socket_type::pair );
   db_rpc.bind( "inproc://db_rpc" );
-  NLOG(DEBUG) << "Bound to inproc:://db_rpc";
+  MDEBUG( "Bound to inproc:://db_rpc" );
 
   // listen to messages
   zmqpp::poller poller;
   poller.add( db_rpc );
-  while (not g_interrupted) {
+  while (1) {
 
     zmqpp::message msg;
     if (client.receive( msg, /* dont_block = */ true )) {
@@ -250,7 +250,7 @@ connect( zmqpp::context& ctx, const std::string& addr, int rpc_port ) {
   // create socket to connect to peers at their rpc port
   zmqpp::socket dealer( ctx, zmqpp::socket_type::dealer );
   dealer.connect( "tcp://" + addr );
-  NLOG(DEBUG) << "Connecting to peer at " + addr;
+  MDEBUG( "Connecting to peer at " + addr );
   return dealer;
 }
 
@@ -295,7 +295,7 @@ rpc_bcast_hashes( int rpc_port,
     msg << std::to_string( my_hashes.size() );
     for (const auto& h : my_hashes) msg << h;
     sock.send( msg );
-    NLOG(DEBUG) << "Broadcasting " << my_hashes.size() << " hashes to " << addr;
+    MDEBUG( "Broadcasting " << my_hashes.size() << " hashes to " << addr );
   }
 
   to_bcast_hashes = false;
@@ -342,7 +342,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
 {
   std::string id, cmd;
   msg >> id >> cmd;
-  NLOG(DEBUG) << "Recv msg: " << cmd;
+  MDEBUG( "Recv msg: " << cmd );
 
   if (cmd == "PEER") {
 
@@ -360,7 +360,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
         to_bcast_hashes = true;
       }
     }
-    NLOG(DEBUG) << "Number of peers: " << my_peers.size();
+    MDEBUG( "Number of peers: " << my_peers.size() );
 
   } else if (cmd == "HASH") {
 
@@ -380,8 +380,8 @@ rpc_answer_rpc( zmqpp::context& ctx,
       }
     }
     auto r = db_requests.find( from );
-    NLOG(DEBUG) << "Recv " << (r != end(db_requests) ? r->second.size() : 0)
-                << " hashes from " << from;
+    MDEBUG( "Recv " << (r != end(db_requests) ? r->second.size() : 0)
+            << " hashes from " << from );
 
   } else if (cmd == "REQ") {
 
@@ -397,7 +397,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
       req << hash;
     }
     db_rpc.send( req );
-    NLOG(DEBUG) << "Will prepare " << size << " db entries for " << addr;
+    MDEBUG( "Will prepare " << size << " db entries for " << addr );
 
   } else if (cmd == "DOC") {
 
@@ -407,7 +407,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
     }
     std::string size;
     msg >> size;
-    NLOG(DEBUG) << "Recv " << size << " db entries";
+    MDEBUG( "Recv " << size << " db entries" );
     std::size_t num = stoul( size );
     assert( num > 0 );
     std::vector< std::string > docs_to_insert;
@@ -423,12 +423,11 @@ rpc_answer_rpc( zmqpp::context& ctx,
     req << "INS" << std::to_string( docs_to_insert.size() );
     for (const auto& doc : docs_to_insert) req << doc;
     db_rpc.send( req );
-    NLOG(DEBUG) << "Attempting to insert " << docs_to_insert.size()
-                << " db entries";
+    MDEBUG( "Attempting to insert " << docs_to_insert.size() << " db entries" );
 
   } else {
 
-    NLOG(WARNING) << "unknown cmd";
+    MERROR( "unknown cmd" );
 
   }
 }
@@ -440,13 +439,13 @@ rpc_answer_ipc( zmqpp::message& msg,
 {
   std::string cmd;
   msg >> cmd;
-  NLOG(DEBUG) << "Recv msg: " << cmd;
+  MDEBUG( "Recv msg: " << cmd );
 
   if (cmd == "PUT") {
 
     std::string addr, size;
     msg >> addr >> size;
-    NLOG(DEBUG) << "Prepared " << size << " db entries for " << addr;
+    MDEBUG( "Prepared " << size << " db entries for " << addr );
     std::size_t num = stoul( size );
     assert( num > 0 );
     zmqpp::message rep;
@@ -457,7 +456,7 @@ rpc_answer_ipc( zmqpp::message& msg,
       rep << doc;
     }
     my_peers.at( addr ).send( rep );
-    NLOG(DEBUG) << "Sent back " << size << " db entries to " << addr;
+    MDEBUG( "Sent back " << size << " db entries to " << addr );
 
   } else if (cmd == "NEW") {
 
@@ -465,7 +464,7 @@ rpc_answer_ipc( zmqpp::message& msg,
 
   } else {
 
-    NLOG(WARNING) << "Recv unknown msg: " << cmd;
+    MERROR( "unknown cmd" );
 
   }
 }
@@ -478,13 +477,13 @@ void rpc_thread( zmqpp::context& ctx,
                  int rpc_port,
                  bool use_strict_ports )
 {
-  el::Helpers::setThreadName( "rpc" );
-  NLOG(INFO) << el::Helpers::getThreadName() << " thread initialized";
+  MLOG_SET_THREAD_NAME( "rpc" );
+  MINFO( "rpc thread initialized" );
 
   // create socket that will listen to peers and bind to rpc port
   zmqpp::socket router( ctx, zmqpp::socket_type::router );
   try_bind( router, rpc_port, 10, use_strict_ports );
-  NLOG(INFO) << "Bound to RPC port " << rpc_port;
+  MINFO( "Bound to RPC port " << rpc_port );
 
   // remove our address from peer list
   my_peers.erase( "localhost:" + std::to_string(rpc_port) );
@@ -494,18 +493,18 @@ void rpc_thread( zmqpp::context& ctx,
                       zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
   // initially connect to peers
   for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, rpc_port );
-  NLOG(DEBUG) << "Initial number of peers: " << my_peers.size();
+  MDEBUG( "Initial number of peers: " << my_peers.size() );
 
   { // log initial number of hashes (populated by db thread)
     std::unique_lock lock( g_hashes_mtx );
     g_hashes_cv.wait( lock, []{ return g_hashes_access; } );
   }
-  NLOG(DEBUG) << "Initial number of db hashes: " << my_hashes.size();
+  MDEBUG( "Initial number of db hashes: " << my_hashes.size() );
 
   // create socket to send requests for db lookups from peers
   zmqpp::socket db_rpc( ctx, zmqpp::socket_type::pair );
   db_rpc.connect( "inproc://db_rpc" );
-  NLOG(DEBUG) << "Connected to inproc:://db_rpc";
+  MDEBUG( "Connected to inproc:://db_rpc" );
 
   std::unordered_map< std::string, std::unordered_set< std::string > >
     db_requests;
@@ -518,7 +517,7 @@ void rpc_thread( zmqpp::context& ctx,
   bool to_bcast_hashes = true;
   bool to_send_db_requests = false;
 
-  while (not g_interrupted) {
+  while (1) {
     rpc_bcast_peers( rpc_port, my_peers, to_bcast_peers );
     rpc_bcast_hashes( rpc_port, my_peers, my_hashes, to_bcast_hashes );
     rpc_send_db_requests( rpc_port, my_peers, db_requests,
@@ -583,9 +582,6 @@ int main( int argc, char **argv ) {
 
   }
 
-  std::string version( "piac: " + piac::daemon_executable() + " v"
-                       + piac::project_version() + "-" + piac::build_type() );
-
   // Defaults
   int server_port = 55090;
   int default_rpc_port = 65090;
@@ -593,87 +589,155 @@ int main( int argc, char **argv ) {
   bool use_strict_ports = false;
   std::string db_name( "piac.db" );
   std::string input_filename;
-  std::string logfile = piac::daemon_executable() + ".log";
+  std::string logfile( piac::daemon_executable() + ".log" );
+  std::string log_level( "4" );
+  std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
+  std::size_t max_log_files = MAX_LOG_FILES;
+  std::string version( "piac: " + piac::daemon_executable() + " v"
+                       + piac::project_version() + "-" + piac::build_type() );
+
   std::vector< std::string > peers;
 
   // Process command line arguments
   int c;
   int option_index = 0;
+  const int ARG_DB                =  999;
+  const int ARG_HELP              = 1000;
+  const int ARG_INPUT             = 1001;
+  const int ARG_LOG_FILE          = 1002;
+  const int ARG_LOG_LEVEL         = 1003;
+  const int ARG_MAX_LOG_FILE_SIZE = 1004;
+  const int ARG_MAX_LOG_FILES     = 1005;
+  const int ARG_PEER              = 1006;
+  const int ARG_PORT              = 1007;
+  const int ARG_RPC_PORT          = 1008;
+  const int ARG_VERSION           = 1009;
   static struct option long_options[] =
-    { // NAME      ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
-      {"db",       required_argument, 0,       'd'},
-      {"detach",   no_argument,       &detach,  1 },
-      {"help",     no_argument,       0,       'h'},
-      {"input",    required_argument, 0,       'i'},
-      {"log",      required_argument, 0,       'l'},
-      {"peer",     required_argument, 0,       'e'},
-      {"port",     required_argument, 0,       'p'},
-      {"rpc-port", required_argument, 0,       'r'},
-      {"version",  no_argument,       0,       'v'},
+    { // NAME               ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
+      {"db",                required_argument, 0,       ARG_DB               },
+      {"detach",            no_argument,       &detach, 1                    },
+      {"help",              no_argument,       0,       ARG_HELP             },
+      {"input",             required_argument, 0,       ARG_INPUT            },
+      {"log-file",          required_argument, 0,       ARG_LOG_FILE         },
+      {"log-level",         required_argument, 0,       ARG_LOG_LEVEL        },
+      {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE},
+      {"max-log-files",     required_argument, 0,       ARG_MAX_LOG_FILES    },
+      {"peer",              required_argument, 0,       ARG_PEER             },
+      {"port",              required_argument, 0,       ARG_PORT             },
+      {"rpc-port",          required_argument, 0,       ARG_RPC_PORT         },
+      {"version",           no_argument,       0,       ARG_VERSION          },
       {0, 0, 0, 0}
     };
-  while ((c = getopt_long( argc, argv, "d:e:hi:l:p:r:v",
-                           long_options, &option_index )) != -1)
-  {
+
+  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
-      case 'd':
+
+      case ARG_DB: {
         db_name = optarg;
         break;
+      }
 
-      case 'h':
-        std::cout << "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
+      case ARG_HELP: {
+        std::cout << version << "\n\n" <<
+          "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
           "OPTIONS\n"
-          "  -d, --db <directory>\n"
+          "  --db <directory>\n"
           "         Use database, default: " + db_name + "\n\n"
           "  --detach\n"
           "         Run as a daemon in the background\n\n"
-          "  -h, --help\n"
+          "  --help\n"
           "         Show help message\n\n"
-          "  -i, --input <filename.json>\n"
+          "  --input <filename.json>\n"
           "         Add the contents of file to database\n\n"
-          "  -l, --log <filename.log>\n"
-          "         Specify Log filename, default: " + logfile + "\n\n"
-          "  -e, --peer <hostname>[:port]\n"
+          "  --log-file <filename.log>\n"
+          "         Specify log filename, default: " + logfile + "\n\n"
+          "  --log-level <[0-4]>\n"
+          "         Specify log level: 0: minimum, 4: maximum\n\n"
+          "  --max-log-file-size <size-in-bytes> \n"
+          "         Specify maximum log file size in bytes. Default: " +
+          std::to_string( MAX_LOG_FILE_SIZE ) + ". Once the log file\n"
+          "         grows past that limit, the next log file is created with "
+                   "a UTC timestamp postfix\n"
+          "         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent "
+                  + piac::cli_executable() + " from managing\n"
+          "         the log files.\n\n"
+          "  --max-log-files <num> \n"
+          "         Specify a limit on the number of log files. Default: " +
+          std::to_string( MAX_LOG_FILES ) + ". The oldest log files\n"
+          "         are removed. In production deployments, you would "
+                   "probably prefer to use\n"
+          "         established solutions like logrotate instead.\n\n"
+          "  --peer <hostname>[:port]\n"
           "         Specify a peer to connect to\n\n"
-          "  -p, --port <port>\n"
+          "  --port <port>\n"
           "         Listen on server port given, default: "
                   + std::to_string( server_port ) + "\n\n"
-          "  -r, --rpc-port <port>\n"
+          "  --rpc-port <port>\n"
           "         Listen on RPC port given, default: "
                   + std::to_string( rpc_port ) + "\n\n"
-          "  -v, --version\n"
-          "         Show version information\n";
+          "  --version\n"
+          "         Show version information\n\n";
         return EXIT_SUCCESS;
+      }
 
-      case 'i':
+      case ARG_INPUT: {
         input_filename = optarg;
         break;
+      }
 
-      case 'e':
+      case ARG_PEER: {
         peers.push_back( optarg );
         break;
+      }
 
-      case 'p':
+      case ARG_PORT: {
         server_port = atoi( optarg );
         use_strict_ports = true;
         break;
+      }
 
-      case 'r':
+      case ARG_RPC_PORT: {
         default_rpc_port = atoi( optarg );
         rpc_port = default_rpc_port;
         use_strict_ports = true;
         break;
+      }
 
-      case 'l':
+      case ARG_LOG_FILE: {
         logfile = optarg;
         break;
+      }
 
-      case 'v':
+      case ARG_LOG_LEVEL: {
+        std::stringstream s;
+        s << optarg;
+        int level;
+        s >> level;
+        if (level < 0) level = 0;
+        if (level > 4) level = 4;
+        log_level = std::to_string( level );
+        break;
+      }
+
+      case ARG_MAX_LOG_FILE_SIZE: {
+        std::stringstream s;
+        s << optarg;
+        s >> max_log_file_size;
+        break;
+      }
+
+      case ARG_MAX_LOG_FILES: {
+        std::stringstream s;
+        s << optarg;
+        s >> max_log_files;
+        break;
+      }
+
+      case ARG_VERSION: {
         std::cout << version << '\n';
         return EXIT_SUCCESS;
+      }
 
-      case '?':
-        return EXIT_FAILURE;
     }
   }
 
@@ -684,20 +748,21 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
-  // Setup logging
-  setup_logging( piac::daemon_executable(), crash_handler, logfile,
-                 /* file_logging = */ true, /* console_logging = */ true );
-
-  NLOG(INFO) << version;
-  std::cout <<
+  std::cout << version << '\n' <<
     "Welcome to piac, where anyone can buy and sell anything privately and\n"
     "securely using the private digital cash, monero. For more information\n"
     "on monero, see https://getmonero.org. This is the server of piac. It\n"
     "can run standalone or as a daemon in the background using --detach.\n"
     "You can use " + piac::cli_executable() + " to interact with it.\n";
 
-  NLOG(INFO) << "Logging to " << logfile;
-  if (detach) NLOG(INFO) << "Forked PID: " << getpid();
+  setup_logging( logfile, log_level, /* console_logging = */ false,
+                 max_log_file_size, max_log_files );
+
+  if (detach) {
+    auto pid = getpid();
+    std::cout << "Forked PID: " << pid << '\n';
+    MINFO( "Forked PID: " << pid );
+  }
 
   // initialize (thread-safe) zmq context
   zmqpp::context ctx;
@@ -723,6 +788,8 @@ int main( int argc, char **argv ) {
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();
+
+  MDEBUG( "graceful exit" );
 
   // Terminate the child process when the daemon completes
   return EXIT_SUCCESS;

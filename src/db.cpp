@@ -45,7 +45,7 @@ piac::get_doccount( const std::string db_name ) {
     Xapian::Database db( db_name );
     return db.get_doccount();
   } catch ( const Xapian::Error &e ) {
-    NLOG(WARNING) << e.get_description();
+    MWARNING( e.get_description() );
   }
   return {};
 }
@@ -109,7 +109,7 @@ piac::index_db( const std::string& db_name,
                 const std::unordered_set< std::string >& my_hashes )
 {
   if (input_filename.empty()) return 0;
-  NLOG(DEBUG) << "Indexing " << input_filename;
+  MDEBUG( "Indexing " << input_filename );
   Xapian::WritableDatabase db( db_name, Xapian::DB_CREATE_OR_OPEN );
   Xapian::TermGenerator indexer;
   Xapian::Stem stemmer( "english" );
@@ -130,7 +130,7 @@ piac::index_db( const std::string& db_name,
       }
     }
 
-    NLOG(DEBUG) << "Indexed " << numins << " entries";
+    MDEBUG( "Indexed " << numins << " entries" );
     // Explicitly commit so that we get to see any errors. WritableDatabase's
     // destructor will commit implicitly (unless we're in a transaction) but
     // will swallow any exceptions produced.
@@ -138,7 +138,7 @@ piac::index_db( const std::string& db_name,
     return numins;
 
   } catch ( const Xapian::Error &e ) {
-    NLOG(ERROR) << e.get_description();
+    MERROR( e.get_description() );
   }
   return 0;
 }
@@ -148,7 +148,7 @@ std::string
 piac::db_query( const std::string& db_name, std::string&& cmd ) {
   try {
 
-    NLOG(DEBUG) << "db query: '" << cmd << "'";
+    MDEBUG( "db query: '" << cmd << "'" );
     // Open the database for searching
     Xapian::Database db( db_name );
     // Start an enquire session
@@ -160,30 +160,30 @@ piac::db_query( const std::string& db_name, std::string&& cmd ) {
     qp.set_database( db );
     qp.set_stemming_strategy( Xapian::QueryParser::STEM_SOME );
     Xapian::Query query = qp.parse_query( cmd );
-    NLOG(DEBUG) << "parsed query: '" << query.get_description() << "'";
+    MDEBUG( "parsed query: '" << query.get_description() << "'" );
     // Find the top 10 results for the query
     enquire.set_query( query );
-    NLOG(DEBUG) << "set query: '" << query.get_description() << "'";
+    MDEBUG( "set query: '" << query.get_description() << "'" );
     Xapian::MSet matches = enquire.get_mset( 0, 10 );
-    NLOG(DEBUG) << "got matches";
+    MDEBUG( "got matches" );
     // Construct the results
     auto nr = matches.get_matches_estimated();
-    NLOG(DEBUG) << "got estimated matches: " << nr;
+    MDEBUG( "got estimated matches: " << nr );
     std::stringstream result;
     result << nr << " results found.";
     if (nr) {
       result << "\nmatches 1-" << matches.size() << ":\n\n";
       for (Xapian::MSetIterator i = matches.begin(); i != matches.end(); ++i) {
-        NLOG(DEBUG) << "getting match: " << i.get_rank();
+        MDEBUG( "getting match: " << i.get_rank() );
         result << i.get_rank() + 1 << ": " << i.get_weight() << " docid=" << *i
                  << " [" << i.get_document().get_data() << "]\n";
       }
     }
-    //NLOG(DEBUG) << "results: " + result.str();
+    //MDEBUG( "results: " + result.str() );
     return result.str();
 
   } catch ( const Xapian::Error &e ) {
-    NLOG(ERROR) << e.get_description();
+    MERROR( e.get_description() );
   }
   return {};
 }
@@ -206,12 +206,12 @@ piac::db_get_docs( const std::string& db_name,
       if (p != db.postlist_end( 'Q' + h ))
         docs.push_back( db.get_document( *p ).get_data() );
       else
-        NLOG(WARNING) << "Document not found: " << hex(h);
+        MWARNING( "Document not found: " << hex(h) );
     }
 
   } catch ( const Xapian::Error &e ) {
     if (e.get_description().find("No such file") == std::string::npos)
-      NLOG(ERROR) << e.get_description();
+      MERROR( e.get_description() );
   }
 
   return docs;
@@ -223,7 +223,7 @@ piac::db_put_docs( const std::string& db_name,
                    const std::vector< std::string >& docs )
 {
   try {
-    NLOG(DEBUG) << "Inserting & indexing " << docs.size() << " new entries";
+    MDEBUG( "Inserting & indexing " << docs.size() << " new entries" );
     Xapian::WritableDatabase db( db_name, Xapian::DB_CREATE_OR_OPEN );
     Xapian::TermGenerator indexer;
     Xapian::Stem stemmer( "english" );
@@ -237,8 +237,8 @@ piac::db_put_docs( const std::string& db_name,
       add_document( indexer, db, ndoc );
     }
 
-    NLOG(DEBUG) << "Finished indexing " << docs.size()
-                << " new entries, commit to db";
+    MDEBUG( "Finished indexing " << docs.size() <<
+            " new entries, commit to db" );
     // Explicitly commit so that we get to see any errors. WritableDatabase's
     // destructor will commit implicitly (unless we're in a transaction) but
     // will swallow any exceptions produced.
@@ -246,7 +246,7 @@ piac::db_put_docs( const std::string& db_name,
     return docs.size();
 
   } catch ( const Xapian::Error &e ) {
-    NLOG(ERROR) << e.get_description();
+    MERROR( e.get_description() );
   }
 
   return 0;
@@ -270,7 +270,7 @@ piac::db_list_hash( const std::string& db_name, bool inhex ) {
 
   } catch ( const Xapian::Error &e ) {
     if (e.get_description().find("No such file") == std::string::npos)
-      NLOG(ERROR) << e.get_description();
+      MERROR( e.get_description() );
   }
 
   return hashes;
@@ -282,11 +282,11 @@ piac::db_add( const std::string& db_name,
               std::string&& cmd,
               const std::unordered_set< std::string >& my_hashes )
 {
-  NLOG(DEBUG) << "db add: '" << cmd << "'";
+  MDEBUG( "db add: '" << cmd << "'" );
   if (cmd[0]=='j' && cmd[1]=='s' && cmd[2]=='o' && cmd[3]=='n') {
     cmd.erase( 0, 5 );
     trim( cmd );
-    NLOG(DEBUG) << "Add json file: '" << cmd << "' to db";
+    MDEBUG( "Add json file: '" << cmd << "' to db" );
     auto numins = index_db( db_name, cmd, my_hashes );
     return "Added " + std::to_string( numins ) + " entries";
   }
@@ -296,7 +296,7 @@ piac::db_add( const std::string& db_name,
 // *****************************************************************************
 std::string
 piac::db_list( const std::string& db_name, std::string&& cmd ) {
-  NLOG(DEBUG) << "db list: '" << cmd << "'";
+  MDEBUG( "db list: '" << cmd << "'" );
   if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
     cmd.erase( 0, 5 );
     auto hashes = db_list_hash( db_name, /* inhex = */ true );
