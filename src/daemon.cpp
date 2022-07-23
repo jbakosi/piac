@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "project_config.hpp"
-#include "logging.hpp"
+#include "util.hpp"
 #include "db.hpp"
 
 std::mutex g_hashes_mtx;
@@ -24,6 +24,7 @@ db_update_hashes( const std::string& db_name,
   auto hashes = piac::db_list_hash( db_name, /* inhex = */ false );
   std::lock_guard lock( g_hashes_mtx );
   g_hashes_access = false;
+  my_hashes.clear();
   for (auto&& h : hashes) my_hashes.insert( std::move(h) );
   g_hashes_access = true;
   g_hashes_cv.notify_one();
@@ -41,6 +42,15 @@ void db_client_op(
 {
   std::string cmd;
   msg >> cmd;
+
+  // extract hash of user auth from cmd if any, remove from cmd (and log)
+  std::string user;
+  auto u = cmd.rfind( "AUTH:" );
+  if (u != std::string::npos) {
+    user = cmd.substr( u + 5 );
+    cmd.erase( u - 1 );
+  }
+
   MDEBUG( "Recv msg " << cmd );
 
   if (cmd == "connect") {
@@ -64,7 +74,8 @@ void db_client_op(
     } else if (q[0]=='a' && q[1]=='d' && q[2]=='d') {
 
       q.erase( 0, 4 );
-      reply = piac::db_add( db_name, std::move(q), my_hashes );
+      assert( not user.empty() );
+      reply = piac::db_add( user, db_name, std::move(q), my_hashes );
       auto ndoc = piac::get_doccount( db_name );
       MDEBUG( "Number of documents: " << ndoc );
       db_update_hashes( db_name, my_hashes );
@@ -187,7 +198,6 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
 void
 db_thread( zmqpp::context& ctx,
            const std::string& db_name,
-           const std::string& input_filename,
            int server_port,
            bool use_strict_ports,
            const std::unordered_map< std::string, zmqpp::socket >& my_peers,
@@ -198,18 +208,8 @@ db_thread( zmqpp::context& ctx,
   MINFO( "Using database: " << db_name );
 
   // initially optionally populate database
-  if (input_filename.empty()) {
-    auto ndoc = piac::get_doccount( db_name );
-    MINFO( "Initial number of documents: " << ndoc );
-  } else {
-    std::ifstream f( input_filename );
-    if (not f.good()) {
-      MERROR( "Database input file does not exist: " << input_filename );
-    } else {
-      MINFO( "Populating database using: " << input_filename );
-      piac::index_db( db_name, input_filename );
-    }
-  }
+  auto ndoc = piac::get_doccount( db_name );
+  MINFO( "Initial number of documents: " << ndoc );
 
   // initially query hashes of db entries
   db_update_hashes( db_name, my_hashes );
@@ -588,7 +588,6 @@ int main( int argc, char **argv ) {
   int rpc_port = default_rpc_port;
   bool use_strict_ports = false;
   std::string db_name( "piac.db" );
-  std::string input_filename;
   std::string logfile( piac::daemon_executable() + ".log" );
   std::string log_level( "4" );
   std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
@@ -603,7 +602,6 @@ int main( int argc, char **argv ) {
   int option_index = 0;
   const int ARG_DB                =  999;
   const int ARG_HELP              = 1000;
-  const int ARG_INPUT             = 1001;
   const int ARG_LOG_FILE          = 1002;
   const int ARG_LOG_LEVEL         = 1003;
   const int ARG_MAX_LOG_FILE_SIZE = 1004;
@@ -617,7 +615,6 @@ int main( int argc, char **argv ) {
       {"db",                required_argument, 0,       ARG_DB               },
       {"detach",            no_argument,       &detach, 1                    },
       {"help",              no_argument,       0,       ARG_HELP             },
-      {"input",             required_argument, 0,       ARG_INPUT            },
       {"log-file",          required_argument, 0,       ARG_LOG_FILE         },
       {"log-level",         required_argument, 0,       ARG_LOG_LEVEL        },
       {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE},
@@ -647,8 +644,6 @@ int main( int argc, char **argv ) {
           "         Run as a daemon in the background\n\n"
           "  --help\n"
           "         Show help message\n\n"
-          "  --input <filename.json>\n"
-          "         Add the contents of file to database\n\n"
           "  --log-file <filename.log>\n"
           "         Specify log filename, default: " + logfile + "\n\n"
           "  --log-level <[0-4]>\n"
@@ -678,11 +673,6 @@ int main( int argc, char **argv ) {
           "  --version\n"
           "         Show version information\n\n";
         return EXIT_SUCCESS;
-      }
-
-      case ARG_INPUT: {
-        input_filename = optarg;
-        break;
       }
 
       case ARG_PEER: {
@@ -755,8 +745,8 @@ int main( int argc, char **argv ) {
     "can run standalone or as a daemon in the background using --detach.\n"
     "You can use " + piac::cli_executable() + " to interact with it.\n";
 
-  setup_logging( logfile, log_level, /* console_logging = */ false,
-                 max_log_file_size, max_log_files );
+  piac::setup_logging( logfile, log_level, /* console_logging = */ false,
+                       max_log_file_size, max_log_files );
 
   if (detach) {
     auto pid = getpid();
@@ -783,8 +773,8 @@ int main( int argc, char **argv ) {
     rpc_port, use_strict_ports );
 
   threads.emplace_back( db_thread,
-    std::ref(ctx), db_name, input_filename, server_port, use_strict_ports,
-    std::ref(my_peers), std::ref(my_hashes) );
+    std::ref(ctx), db_name, server_port, use_strict_ports, std::ref(my_peers),
+    std::ref(my_hashes) );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();

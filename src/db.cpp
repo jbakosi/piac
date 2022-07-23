@@ -1,42 +1,7 @@
 #include <string>
 
-#include <cryptopp/sha.h>
-#include <cryptopp/files.h>
-#include <cryptopp/hex.h>
-
-#include "logging.hpp"
+#include "util.hpp"
 #include "db.hpp"
-
-// ****************************************************************************
-std::string
-piac::sha256( const std::string& msg ) {
-  using namespace CryptoPP;
-  std::string digest;
-  SHA256 hash;
-  hash.Update(( const byte*)msg.data(), msg.size() );
-  digest.resize( hash.DigestSize() );
-  hash.Final( (byte*)&digest[0] );
-  return digest;
-}
-
-// ****************************************************************************
-std::string
-piac::hex( const std::string& digest ) {
-  using namespace CryptoPP;
-  std::string hex;
-  HexEncoder encoder( new StringSink( hex ) );
-  StringSource( digest, true, new Redirector( encoder ) );
-  return hex;
-}
-
-// ****************************************************************************
-void trim( std::string& s ) {
-  const std::string WHITESPACE( " \n\r\t\f\v" );
-  auto p = s.find_first_not_of( WHITESPACE );
-  s = p == std::string::npos ? "" : s.substr( p );
-  p = s.find_last_not_of( WHITESPACE );
-  s = p == std::string::npos ? "" : s.substr( 0, p + 1 );
-}
 
 // ****************************************************************************
 Xapian::doccount
@@ -52,15 +17,16 @@ piac::get_doccount( const std::string db_name ) {
 
 // ****************************************************************************
 std::string
-piac::add_document( Xapian::TermGenerator& indexer,
+piac::add_document( const std::string& author,
+                    Xapian::TermGenerator& indexer,
                     Xapian::WritableDatabase& db,
                     Document& ndoc )
 {
+  assert( not author.empty() );
   Xapian::Document doc;
   indexer.set_document( doc );
   // Index each field with a suitable prefix
   indexer.index_text( ndoc.title(), 1, "S" );
-  indexer.index_text( ndoc.author(), 1, "A" );
   indexer.index_text( ndoc.description(), 1, "XD" );
   indexer.index_text( ndoc.category(), 1, "XC" );
   indexer.index_text( ndoc.condition(), 1, "XO" );
@@ -70,8 +36,6 @@ piac::add_document( Xapian::TermGenerator& indexer,
   indexer.index_text( ndoc.keywords(), 1, "K" );
   // Index fields without prefixes for general search
   indexer.index_text( ndoc.title() );
-  indexer.increase_termpos();
-  indexer.index_text( ndoc.author() );
   indexer.increase_termpos();
   indexer.index_text( ndoc.description() );
   indexer.increase_termpos();
@@ -88,8 +52,9 @@ piac::add_document( Xapian::TermGenerator& indexer,
   indexer.index_text( ndoc.keywords() );
   // Add value fields
   doc.add_value( XapianValues::PRICE, std::to_string( ndoc.price() ) );
-  // Generate a hash of the above fields and store it in the document
+  // Generate a hash of the doc fields and store it in the document
   auto entry = ndoc.serialize();
+  ndoc.author( author );
   ndoc.sha( sha256( entry ) );
   auto sha = ndoc.sha();
   // Ensure each object ends up in the database only once no matter how
@@ -104,11 +69,19 @@ piac::add_document( Xapian::TermGenerator& indexer,
 
 // ****************************************************************************
 std::size_t
-piac::index_db( const std::string& db_name,
+piac::index_db( const std::string& author,
+                const std::string& db_name,
                 const std::string& input_filename,
                 const std::unordered_set< std::string >& my_hashes )
 {
-  if (input_filename.empty()) return 0;
+  assert( not author.empty() );
+
+  std::ifstream f( input_filename );
+  if (not f.good()) {
+    MERROR( "Cannot open database input file: " + input_filename );
+    return 0;
+  }
+
   MDEBUG( "Indexing " << input_filename );
   Xapian::WritableDatabase db( db_name, Xapian::DB_CREATE_OR_OPEN );
   Xapian::TermGenerator indexer;
@@ -125,7 +98,7 @@ piac::index_db( const std::string& db_name,
     for (auto& d : ndoc.documents()) {
       auto entry = d.serialize();
       if (my_hashes.find( sha256( entry ) ) == end(my_hashes)) {
-        add_document( indexer, db, d );
+        add_document( author, indexer, db, d );
         ++numins;
       }
     }
@@ -234,7 +207,9 @@ piac::db_put_docs( const std::string& db_name,
     for (const auto& d : docs) {
       Document ndoc;
       ndoc.deserialize( d );
-      add_document( indexer, db, ndoc );
+      // refuse doc without author
+      auto author = ndoc.author();
+      if (not author.empty()) add_document( author, indexer, db, ndoc );
     }
 
     MDEBUG( "Finished indexing " << docs.size() <<
@@ -278,16 +253,18 @@ piac::db_list_hash( const std::string& db_name, bool inhex ) {
 
 // *****************************************************************************
 std::string
-piac::db_add( const std::string& db_name,
+piac::db_add( const std::string& author,
+              const std::string& db_name,
               std::string&& cmd,
               const std::unordered_set< std::string >& my_hashes )
 {
   MDEBUG( "db add: '" << cmd << "'" );
+  assert( not author.empty() );
   if (cmd[0]=='j' && cmd[1]=='s' && cmd[2]=='o' && cmd[3]=='n') {
     cmd.erase( 0, 5 );
     trim( cmd );
     MDEBUG( "Add json file: '" << cmd << "' to db" );
-    auto numins = index_db( db_name, cmd, my_hashes );
+    auto numins = index_db( author, db_name, cmd, my_hashes );
     return "Added " + std::to_string( numins ) + " entries";
   }
   return {};

@@ -7,7 +7,7 @@
 #include "wallet/monero_wallet_full.h"
 
 #include "project_config.hpp"
-#include "logging.hpp"
+#include "util.hpp"
 
 // *****************************************************************************
 void disconnect( bool& connected,
@@ -56,13 +56,30 @@ void status( bool connected ) {
 }
 
 // *****************************************************************************
-void send_cmd( bool connected, zmqpp::socket& server, const std::string& cmd ) {
+void send_cmd( bool connected,
+               zmqpp::socket& server,
+               std::string cmd,
+               const std::unique_ptr< monero_wallet_full >& wallet )
+{
+  piac::trim( cmd );
   MDEBUG( cmd );
   if (not connected) {
     std::cout << "Not connected. Use 'connect' to connect to "
                << piac::daemon_executable() << ".\n";
     return;
   }
+
+  // append author if cmd contains "db add"
+  auto npos = std::string::npos;
+  if (cmd.find("db") != npos && cmd.find("add") != npos) {
+    if (not wallet) {
+      std::cout << "Need active user id (wallet) to add to db. "
+                   "See 'new' or 'user'.\n";
+      return;
+    }
+    cmd += " AUTH:" + piac::sha256( wallet->get_primary_address() );
+  }
+
   // send message to server with command
   server.send( cmd );
   // wait for reply from server
@@ -272,8 +289,8 @@ int main( int argc, char **argv ) {
     "of piac. It needs to connect to a " + piac::daemon_executable() + " to "
     "work correctly. Type\n'help' to list the available commands.\n";
 
-  setup_logging( logfile, log_level, /* console_logging = */ false,
-                 max_log_file_size, max_log_files );
+  piac::setup_logging( logfile, log_level, /* console_logging = */ false,
+                       max_log_file_size, max_log_files );
 
   std::string host = "localhost:55090";
   bool connected = false;
@@ -302,7 +319,7 @@ int main( int argc, char **argv ) {
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
-      send_cmd( connected, server, buf );
+      send_cmd( connected, server, buf, wallet );
 
     } else  if (!strcmp(buf,"disconnect")) {
 
@@ -371,7 +388,7 @@ int main( int argc, char **argv ) {
 
     } else if (!strcmp(buf,"peers")) {
 
-      send_cmd( connected, server, "peers" );
+      send_cmd( connected, server, "peers", nullptr );
 
     } else if (!strcmp(buf,"status")) {
 
@@ -392,6 +409,10 @@ int main( int argc, char **argv ) {
     } else if (!strcmp(buf,"version")) {
 
       std::cout << version << '\n';
+
+    } else {
+
+      std::cout << "unknown cmd\n";
 
     }
 

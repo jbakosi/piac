@@ -117,6 +117,16 @@ install(TARGETS db
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
+add_library(util ${PIAC_SOURCE_DIR}/util.cpp)
+target_include_directories(util PUBLIC ${PIAC_SOURCE_DIR}
+                                       ${TPL_DIR}/include
+                                       ${cryptopp_INCLUDE_DIRS})
+set_target_properties(util PROPERTIES LIBRARY_OUTPUT_NAME piac_util)
+install(TARGETS util
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
 add_executable(${DAEMON_EXECUTABLE}
@@ -128,7 +138,7 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
-                      db
+                      db util
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}
@@ -154,12 +164,14 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
+                      util
                       ${ZMQPP_LIBRARIES}
                       ${Readline_LIBRARY}
                       ${Boost_SERIALIZATION_LIBRARY}
                       ${OPENSSL_CRYPTO_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}
                       ${MONEROCPP_LIBRARIES}
+                      cryptopp::cryptopp
                       Threads::Threads)
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime

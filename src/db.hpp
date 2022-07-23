@@ -59,7 +59,7 @@ class Document : public JSONBase {
     void title( const std::string& t ) { m_title = t; }
 
     const std::string& author() const { return m_author; }
-    void author( const std::string& t ) { m_author = t; }
+    void author( const std::string& a ) { m_author = a; }
 
     const std::string& description() const { return m_description; }
     void description( const std::string& d ) { m_description = d; }
@@ -158,19 +158,17 @@ namespace XapianValues {
   Xapian::valueno PRICE = 1;
 }
 
-std::string sha256( const std::string& msg );
-
-std::string hex( const std::string& digest );
-
 Xapian::doccount get_doccount( const std::string db_name );
 
 std::string
-add_document( Xapian::TermGenerator& indexer,
+add_document( const std::string& author,
+              Xapian::TermGenerator& indexer,
               Xapian::WritableDatabase& db,
               Document& ndoc );
 
 std::size_t
-index_db( const std::string& db_name,
+index_db( const std::string& author,
+          const std::string& db_name,
           const std::string& input_filename,
           const std::unordered_set< std::string >& my_hashes = {} );
 
@@ -188,9 +186,11 @@ db_put_docs( const std::string& db_name,
 [[nodiscard]] std::vector< std::string >
 db_list_hash( const std::string& db_name, bool inhex );
 
-std::string db_add( const std::string& db_name,
-            std::string&& cmd_string,
-            const std::unordered_set< std::string >& my_hashes = {} );
+std::string
+db_add( const std::string& author,
+        const std::string& db_name,
+        std::string&& cmd_string,
+        const std::unordered_set< std::string >& my_hashes = {} );
 
 std::string db_list( const std::string& db_name, std::string&& cmd_string );
 

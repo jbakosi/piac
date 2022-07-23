@@ -31,6 +31,13 @@ set_tests_properties(cli_zmq_version PROPERTIES
                      PASS_REGULAR_EXPRESSION "${CLI_EXECUTABLE} v"
                      LABELS "zmq")
 
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.badcmd" _in)
+add_test(NAME cli_zmq_badcmd
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_zmq_badcmd PROPERTIES
+                     PASS_REGULAR_EXPRESSION "unknown cmd"
+                     LABELS "zmq")
+
 add_test(NAME cli_zmq_arg_version COMMAND ${CLI_EXECUTABLE} --version)
 set_tests_properties(cli_zmq_arg_version PROPERTIES
                      PASS_REGULAR_EXPRESSION "${CLI_EXECUTABLE} v"

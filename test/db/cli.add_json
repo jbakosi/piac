@@ -1,3 +1,0 @@
-connect localhost:55092
-db add json docs.json
-exit
