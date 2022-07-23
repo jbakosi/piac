@@ -51,7 +51,7 @@ set_tests_properties(cli_db_add_rnd_json_entry_p2p PROPERTIES
                      DEPENDS generate_rnd_json_entry_p2p
                      LABELS "p2p")
 
-add_test(NAME wait4comm_p2p COMMAND sleep 1)
+add_test(NAME wait4comm_p2p COMMAND sleep 0)
 set_tests_properties(wait4comm_p2p PROPERTIES
                      DEPENDS cli_db_add_rnd_json_entry_p2p
                      LABELS "p2p")
@@ -72,11 +72,25 @@ set_tests_properties(daemon3_p2p_grep PROPERTIES
                      DEPENDS wait4comm_p2p
                      LABELS "p2p")
 
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.status.connected" _in)
-add_test(NAME cli_status_connected
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.new" _in)
+add_test(NAME cli_new_p2p
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
-set_tests_properties(cli_status_connected PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Connected"
+set_tests_properties(cli_new_p2p PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Mnemonic seed:"
+                     LABELS "p2p")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.user" _in)
+add_test(NAME cli_user_p2p
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_user_p2p PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Primary address: 9v1yTe3u4ox9ew2nJHrCf4SBhr4xkLXyJa3LDsWoLPNX2fWQ6dpr3HBhUqFaoYA8T48Fh52qZdHzV8hUaFMs7Jtx6tAPTPy"
+                     LABELS "p2p")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.wordcount" _in)
+add_test(NAME cli_wordcount_p2p
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_wordcount_p2p PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Need 25 words"
                      LABELS "p2p")
 
 add_test(NAME kill_daemon_p2p COMMAND kill_daemon ${DAEMON_EXECUTABLE}.log)
@@ -100,6 +114,7 @@ set_tests_properties(kill_daemon3_p2p PROPERTIES
 set_property(TEST daemon_p2p_detach daemon2_p2p_detach daemon3_p2p_detach
              PROPERTY FIXTURES_SETUP daemon_p2p)
 set_tests_properties(generate_rnd_json_entry_p2p cli_db_add_rnd_json_entry_p2p
+                     cli_user_p2p cli_new_p2p cli_wordcount_p2p
                      daemon_p2p_grep daemon2_p2p_grep daemon3_p2p_grep
                      PROPERTIES FIXTURES_REQUIRED daemon_p2p)
 set_property(TEST kill_daemon_p2p kill_daemon2_p2p kill_daemon3_p2p

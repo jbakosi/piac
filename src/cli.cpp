@@ -3,8 +3,8 @@
 #include <readline/readline.h>
 #include <getopt.h>
 
-//#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-//#include "wallet/monero_wallet_full.h"
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+#include "wallet/monero_wallet_full.h"
 
 #include "project_config.hpp"
 #include "logging.hpp"
@@ -32,7 +32,7 @@ void connect( bool& connected, zmqpp::socket& server, const std::string& host )
     std::cout << "You need to disconnect first\n";
     return;
   }
-  std::cout << "Connecting to " + piac::daemon_executable() << " at " << host
+  std::cout << "Connecting to '" + piac::daemon_executable() << "' at " << host
             << '\n';
   server.connect( "tcp://" + host );
   server.send( "connect" );
@@ -86,9 +86,59 @@ std::string color_string( const std::string &s, COLOR color = GRAY ) {
 }
 
 // *****************************************************************************
-void create_new_wallet() {
-//  auto w = monero_wallet_full::create_wallet_random( "", "", monero_network_type::TESTNET );
-//  std::cout << "seed: " << w->get_mnemonic() << '\n';
+[[nodiscard]] std::unique_ptr< monero_wallet_full >
+create_wallet() {
+  MDEBUG( "new" );
+  auto w = monero_wallet_full::create_wallet_random( "", "",
+             monero_network_type::TESTNET );
+  std::cout << "Mnemonic seed: " << w->get_mnemonic() << '\n' <<
+    "This is your monero wallet mnemonic seed that identifies you within\n"
+    "piac. You can use it to create your ads or pay for a product. This seed\n"
+    "can be restored within your favorite monero wallet software and you can\n"
+    "use this wallet just like any other monero wallet. Save this seed and\n"
+    "keep it secret.\n";
+  return std::unique_ptr< monero_wallet_full >( w );
+}
+
+// *****************************************************************************
+void
+show_wallet_keys( const monero_wallet_full& wallet ) {
+  MDEBUG( "keys" );
+  std::cout << "Mnemonic seed: " << wallet.get_mnemonic() << '\n';
+  std::cout << "Primary address: " << wallet.get_primary_address() << '\n';
+  std::cout << "Secret view key: " << wallet.get_private_view_key() << '\n';
+  std::cout << "Public view key: " << wallet.get_public_view_key() << '\n';
+  std::cout << "Secret spend key: " << wallet.get_private_spend_key() << '\n';
+  std::cout << "Public spend key: " << wallet.get_public_spend_key() << '\n';
+}
+
+// *****************************************************************************
+[[nodiscard]] std::unique_ptr< monero_wallet_full >
+switch_user( const std::string& mnemonic ) {
+  MDEBUG( "user" );
+  assert( not mnemonic.empty() );
+  auto w = monero_wallet_full::create_wallet_from_mnemonic( "", "",
+             monero_network_type::TESTNET, mnemonic );
+  std::cout << "Switched to new user\n";
+  return std::unique_ptr< monero_wallet_full >( w );
+}
+
+// ****************************************************************************
+[[nodiscard]] int wordcount( const std::string& s ) {
+  auto str = s.data();
+  if (str == NULL) return 0;
+  bool inSpaces = true;
+  int numWords = 0;
+  while (*str != '\0') {
+    if (std::isspace(*str)) {
+      inSpaces = true;
+    } else if (inSpaces) {
+      numWords++;
+      inSpaces = false;
+    }
+     ++str;
+  }
+  return numWords;
 }
 
 // *****************************************************************************
@@ -214,6 +264,9 @@ int main( int argc, char **argv ) {
   std::string host = "localhost:55090";
   bool connected = false;
 
+  // monero wallet = user id
+  std::unique_ptr< monero_wallet_full > wallet;
+
   // initialize the zmq context with a single IO thread
   zmqpp::context context;
   // construct a REQ (request) socket
@@ -229,11 +282,8 @@ int main( int argc, char **argv ) {
         buf[4]=='e' && buf[5]=='c' && buf[6]=='t')
     {
       std::string b( buf );
-      b.erase( 0, 7 );
-      if (not b.empty()) {
-        std::stringstream ss( b );
-        ss >> host;
-      }
+      b.erase( 0, 8 );
+      if (not b.empty()) host = b;
       connect( connected, server, host );
 
     } else if (buf[0]=='d' && buf[1]=='b') {
@@ -272,13 +322,17 @@ int main( int argc, char **argv ) {
         "                Exit\n\n"
         "      help\n"
         "                This help message\n\n"
+        "      keys\n"
+        "                Show monero wallet keys of current user identity\n\n"
         "      new\n"
         "                Create new user identity. This will generate a new "
                         "monero wallet\n"
-        "                that will be used to identify you when creating an ad "
+        "                which will be used as a user id when creating an ad "
                         "or paying for\n"
         "                an item. This wallet can be used just like any other "
-                        "monero wallet.\n\n"
+                        "monero wallet.\n"
+        "                If you want to use your existing monero wallet, see "
+                        "'user'.\n\n"
         "      peers\n"
         "                List peers of " + piac::daemon_executable() + ". You "
                         "must have connected to a " + piac::daemon_executable()
@@ -286,12 +340,22 @@ int main( int argc, char **argv ) {
         "                first. See 'connect'.\n\n"
         "      status\n"
 	"                Query status\n\n"
+        "      user <mnemonic>\n"
+	"                Switch user id to known monero wallet mnemonic.\n\n"
         "      version\n"
 	"                Display " + piac::cli_executable() + " version\n";
 
+    } else if (!strcmp(buf,"keys")) {
+
+      if (not wallet) {
+        std::cout << "Need user id (wallet). See 'new' or 'user'.\n";
+      } else {
+        show_wallet_keys( *wallet );
+      }
+
     } else if (!strcmp(buf,"new")) {
 
-      create_new_wallet();
+      wallet = create_wallet();
 
     } else if (!strcmp(buf,"peers")) {
 
@@ -300,6 +364,18 @@ int main( int argc, char **argv ) {
     } else if (!strcmp(buf,"status")) {
 
       status( connected );
+
+    } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
+
+      std::string mnemonic( buf );
+      mnemonic.erase( 0, 5 );
+      if (mnemonic.empty()) {
+        std::cout << "Need mnemonic\n";
+      } else if (wordcount( mnemonic ) != 25) {
+        std::cout << "Need 25 words\n";
+      } else {
+        wallet = switch_user( mnemonic );
+      }
 
     } else if (!strcmp(buf,"version")) {
 
@@ -313,7 +389,7 @@ int main( int argc, char **argv ) {
     free( buf );
   }
 
-  disconnect( connected, server, host );
+  if (connected) disconnect( connected, server, host );
   MDEBUG( "graceful exit" );
 
   return EXIT_SUCCESS;

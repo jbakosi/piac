@@ -156,10 +156,10 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       ${ZMQPP_LIBRARIES}
                       ${Readline_LIBRARY}
-                      #${Boost_SERIALIZATION_LIBRARY}
-                      #${OPENSSL_CRYPTO_LIBRARIES}
+                      ${Boost_SERIALIZATION_LIBRARY}
+                      ${OPENSSL_CRYPTO_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}
-                      #${MONEROCPP_LIBRARIES}
+                      ${MONEROCPP_LIBRARIES}
                       Threads::Threads)
 install(TARGETS ${CLI_EXECUTABLE}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
