@@ -102,14 +102,18 @@ create_wallet() {
 
 // *****************************************************************************
 void
-show_wallet_keys( const monero_wallet_full& wallet ) {
+show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
   MDEBUG( "keys" );
-  std::cout << "Mnemonic seed: " << wallet.get_mnemonic() << '\n';
-  std::cout << "Primary address: " << wallet.get_primary_address() << '\n';
-  std::cout << "Secret view key: " << wallet.get_private_view_key() << '\n';
-  std::cout << "Public view key: " << wallet.get_public_view_key() << '\n';
-  std::cout << "Secret spend key: " << wallet.get_private_spend_key() << '\n';
-  std::cout << "Public spend key: " << wallet.get_public_spend_key() << '\n';
+  if (not wallet) {
+    std::cout << "Need active user id (wallet). See 'new' or 'user'.\n";
+    return;
+  }
+  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
+  std::cout << "Primary address: " << wallet->get_primary_address() << '\n';
+  std::cout << "Secret view key: " << wallet->get_private_view_key() << '\n';
+  std::cout << "Public view key: " << wallet->get_public_view_key() << '\n';
+  std::cout << "Secret spend key: " << wallet->get_private_spend_key() << '\n';
+  std::cout << "Public spend key: " << wallet->get_public_spend_key() << '\n';
 }
 
 // *****************************************************************************
@@ -121,6 +125,16 @@ switch_user( const std::string& mnemonic ) {
              monero_network_type::TESTNET, mnemonic );
   std::cout << "Switched to new user\n";
   return std::unique_ptr< monero_wallet_full >( w );
+}
+
+// *****************************************************************************
+void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
+  MDEBUG( "user" );
+  if (not wallet) {
+    std::cout << "No active user id (wallet). See 'new' or 'user'.\n";
+    return;
+  }
+  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
 }
 
 // ****************************************************************************
@@ -340,18 +354,16 @@ int main( int argc, char **argv ) {
         "                first. See 'connect'.\n\n"
         "      status\n"
 	"                Query status\n\n"
-        "      user <mnemonic>\n"
-	"                Switch user id to known monero wallet mnemonic.\n\n"
+        "      user [<mnemonic>]\n"
+	"                Show active monero wallet mnemonic seed (user id) if "
+                        "no mnemonic is\n"
+        "                given. Switch to mnemonic if given.\n\n"
         "      version\n"
 	"                Display " + piac::cli_executable() + " version\n";
 
     } else if (!strcmp(buf,"keys")) {
 
-      if (not wallet) {
-        std::cout << "Need user id (wallet). See 'new' or 'user'.\n";
-      } else {
-        show_wallet_keys( *wallet );
-      }
+      show_wallet_keys( wallet );
 
     } else if (!strcmp(buf,"new")) {
 
@@ -370,8 +382,8 @@ int main( int argc, char **argv ) {
       std::string mnemonic( buf );
       mnemonic.erase( 0, 5 );
       if (mnemonic.empty()) {
-        std::cout << "Need mnemonic\n";
-      } else if (wordcount( mnemonic ) != 25) {
+        show_user( wallet );
+      } else if (wordcount(mnemonic) != 25) {
         std::cout << "Need 25 words\n";
       } else {
         wallet = switch_user( mnemonic );

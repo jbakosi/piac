@@ -86,6 +86,20 @@ set_tests_properties(cli_user_p2p PROPERTIES
                      PASS_REGULAR_EXPRESSION "Primary address: 9v1yTe3u4ox9ew2nJHrCf4SBhr4xkLXyJa3LDsWoLPNX2fWQ6dpr3HBhUqFaoYA8T48Fh52qZdHzV8hUaFMs7Jtx6tAPTPy"
                      LABELS "p2p")
 
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.nouser" _in)
+add_test(NAME cli_nouser_p2p
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_nouser_p2p PROPERTIES
+                     PASS_REGULAR_EXPRESSION "No active user id"
+                     LABELS "p2p")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.nokeys" _in)
+add_test(NAME cli_nokeys_p2p
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_nokeys_p2p PROPERTIES
+                     PASS_REGULAR_EXPRESSION "No active user id"
+                     LABELS "p2p")
+
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.wordcount" _in)
 add_test(NAME cli_wordcount_p2p
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
@@ -114,7 +128,8 @@ set_tests_properties(kill_daemon3_p2p PROPERTIES
 set_property(TEST daemon_p2p_detach daemon2_p2p_detach daemon3_p2p_detach
              PROPERTY FIXTURES_SETUP daemon_p2p)
 set_tests_properties(generate_rnd_json_entry_p2p cli_db_add_rnd_json_entry_p2p
-                     cli_user_p2p cli_new_p2p cli_wordcount_p2p
+                     cli_user_p2p cli_nouser_p2p cli_nokeys_p2p cli_new_p2p
+                     cli_wordcount_p2p
                      daemon_p2p_grep daemon2_p2p_grep daemon3_p2p_grep
                      PROPERTIES FIXTURES_REQUIRED daemon_p2p)
 set_property(TEST kill_daemon_p2p kill_daemon2_p2p kill_daemon3_p2p
