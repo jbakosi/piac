@@ -18,7 +18,7 @@
 FROM debian:bullseye
 
 # Install system-wide prerequisites
-RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev libeasyloggingpp-dev rapidjson-dev libreadline-dev libcrypto++-dev
+RUN apt-get update -y && apt-get install -y git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev rapidjson-dev libreadline-dev libcrypto++-dev libssl-dev
 
 # Clone piac
 RUN git clone https://codeberg.org/piac/piac.git
