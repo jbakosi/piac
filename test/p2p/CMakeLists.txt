@@ -51,7 +51,7 @@ set_tests_properties(cli_db_add_rnd_json_entry_p2p PROPERTIES
                      DEPENDS generate_rnd_json_entry_p2p
                      LABELS "p2p")
 
-add_test(NAME wait4comm_p2p COMMAND sleep 0)
+add_test(NAME wait4comm_p2p COMMAND sleep 1)
 set_tests_properties(wait4comm_p2p PROPERTIES
                      DEPENDS cli_db_add_rnd_json_entry_p2p
                      LABELS "p2p")
