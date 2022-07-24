@@ -166,7 +166,7 @@ add_document( const std::string& author,
               Xapian::WritableDatabase& db,
               Document& ndoc );
 
-std::size_t
+std::string
 index_db( const std::string& author,
           const std::string& db_name,
           const std::string& input_filename,
@@ -183,6 +183,12 @@ std::size_t
 db_put_docs( const std::string& db_name,
              const std::vector< std::string >& docs );
 
+std::string
+db_rm_docs( const std::string& author,
+            const std::string& db_name,
+            const std::unordered_set< std::string >& hashes_to_delete,
+            const std::unordered_set< std::string >& my_hashes = {} );
+
 [[nodiscard]] std::vector< std::string >
 db_list_hash( const std::string& db_name, bool inhex );
 
@@ -191,6 +197,12 @@ db_add( const std::string& author,
         const std::string& db_name,
         std::string&& cmd_string,
         const std::unordered_set< std::string >& my_hashes = {} );
+
+std::string
+db_rm( const std::string& author,
+       const std::string& db_name,
+       std::string&& cmd_string,
+       const std::unordered_set< std::string >& my_hashes );
 
 std::string db_list( const std::string& db_name, std::string&& cmd_string );
 

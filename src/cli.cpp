@@ -69,9 +69,11 @@ void send_cmd( bool connected,
     return;
   }
 
-  // append author if cmd contains "db add"
+  // append author if cmd contains "db add/rm"
   auto npos = std::string::npos;
-  if (cmd.find("db") != npos && cmd.find("add") != npos) {
+  if ( cmd.find("db") != npos &&
+      (cmd.find("add") != npos || cmd.find("rm") != npos) )
+  {
     if (not wallet) {
       std::cout << "Need active user id (wallet) to add to db. "
                    "See 'new' or 'user'.\n";

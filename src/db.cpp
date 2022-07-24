@@ -53,8 +53,8 @@ piac::add_document( const std::string& author,
   // Add value fields
   doc.add_value( XapianValues::PRICE, std::to_string( ndoc.price() ) );
   // Generate a hash of the doc fields and store it in the document
-  auto entry = ndoc.serialize();
   ndoc.author( author );
+  auto entry = ndoc.serialize();
   ndoc.sha( sha256( entry ) );
   auto sha = ndoc.sha();
   // Ensure each object ends up in the database only once no matter how
@@ -68,7 +68,7 @@ piac::add_document( const std::string& author,
 }
 
 // ****************************************************************************
-std::size_t
+std::string
 piac::index_db( const std::string& author,
                 const std::string& db_name,
                 const std::string& input_filename,
@@ -78,8 +78,7 @@ piac::index_db( const std::string& author,
 
   std::ifstream f( input_filename );
   if (not f.good()) {
-    MERROR( "Cannot open database input file: " + input_filename );
-    return 0;
+    return "Cannot open database input file: " + input_filename;
   }
 
   MDEBUG( "Indexing " << input_filename );
@@ -88,32 +87,30 @@ piac::index_db( const std::string& author,
   Xapian::Stem stemmer( "english" );
   indexer.set_stemmer( stemmer );
   indexer.set_stemming_strategy( indexer.STEM_SOME_FULL_POS );
+  std::size_t numins = 0;
   try {
-
     // Read json db from file
     Documents ndoc;
     ndoc.deserializeFromFile( input_filename );
     // Insert documents we do not yet have from json into xapian db
-    std::size_t numins = 0;
     for (auto& d : ndoc.documents()) {
+      d.author( author );
       auto entry = d.serialize();
       if (my_hashes.find( sha256( entry ) ) == end(my_hashes)) {
         add_document( author, indexer, db, d );
         ++numins;
       }
     }
-
     MDEBUG( "Indexed " << numins << " entries" );
     // Explicitly commit so that we get to see any errors. WritableDatabase's
     // destructor will commit implicitly (unless we're in a transaction) but
     // will swallow any exceptions produced.
     db.commit();
-    return numins;
 
   } catch ( const Xapian::Error &e ) {
     MERROR( e.get_description() );
   }
-  return 0;
+  return "Added " + std::to_string( numins ) + " entries";
 }
 
 // *****************************************************************************
@@ -228,6 +225,48 @@ piac::db_put_docs( const std::string& db_name,
 }
 
 // *****************************************************************************
+std::string
+piac::db_rm_docs( const std::string& author,
+                  const std::string& db_name,
+                  const std::unordered_set< std::string >& hashes_to_delete,
+                  const std::unordered_set< std::string >& my_hashes )
+{
+  std::size_t numrm = 0;
+  try {
+
+    Xapian::WritableDatabase db( db_name );
+    Xapian::doccount dbsize = db.get_doccount();
+    if (dbsize == 0) return "no docs";
+
+    for (const auto& h : my_hashes) {
+      assert( h.size() == 32 );
+      auto p = db.postlist_begin( 'Q' + h );
+      if ( p != db.postlist_end( 'Q' + h ) &&
+           hashes_to_delete.find(hex(h)) != end(hashes_to_delete) )
+      {
+        auto entry = db.get_document( *p ).get_data();
+        Document ndoc;
+        ndoc.deserialize( entry );
+        if (author == ndoc.author()) {
+          MDEBUG( "db rm" + sha256(h) );
+          db.delete_document( 'Q' + h );
+          ++numrm;
+        } else {
+          MDEBUG( "db rm auth: " + hex(author) + " != " + hex(ndoc.author()) );
+          return "db rm: author != user";
+        }
+      }
+    }
+
+  } catch ( const Xapian::Error &e ) {
+    if (e.get_description().find("No such file") == std::string::npos)
+      MERROR( e.get_description() );
+  }
+
+  return "Removed " + std::to_string( numrm ) + " entries";
+}
+
+// *****************************************************************************
 std::vector< std::string >
 piac::db_list_hash( const std::string& db_name, bool inhex ) {
   std::vector< std::string > hashes;
@@ -258,22 +297,38 @@ piac::db_add( const std::string& author,
               std::string&& cmd,
               const std::unordered_set< std::string >& my_hashes )
 {
-  MDEBUG( "db add: '" << cmd << "'" );
+  trim( cmd );
+  MDEBUG( "db add " + cmd );
   assert( not author.empty() );
   if (cmd[0]=='j' && cmd[1]=='s' && cmd[2]=='o' && cmd[3]=='n') {
     cmd.erase( 0, 5 );
-    trim( cmd );
     MDEBUG( "Add json file: '" << cmd << "' to db" );
-    auto numins = index_db( author, db_name, cmd, my_hashes );
-    return "Added " + std::to_string( numins ) + " entries";
+    return index_db( author, db_name, cmd, my_hashes );
   }
-  return {};
+  return "unknown cmd";
+}
+
+// *****************************************************************************
+std::string
+piac::db_rm( const std::string& author,
+             const std::string& db_name,
+             std::string&& cmd,
+             const std::unordered_set< std::string >& my_hashes )
+{
+  trim( cmd );
+  MDEBUG( "db rm " + cmd );
+  assert( not author.empty() );
+  if (not cmd.empty()) {
+    return db_rm_docs( author, db_name, tokenize(cmd), my_hashes );
+  }
+  return "unknown cmd";
 }
 
 // *****************************************************************************
 std::string
 piac::db_list( const std::string& db_name, std::string&& cmd ) {
-  MDEBUG( "db list: '" << cmd << "'" );
+  trim( cmd );
+  MDEBUG( "db list " + cmd );
   if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
     cmd.erase( 0, 5 );
     auto hashes = db_list_hash( db_name, /* inhex = */ true );
@@ -283,5 +338,5 @@ piac::db_list( const std::string& db_name, std::string&& cmd ) {
     result.pop_back();
     return result;
   }
-  return {};
+  return "unknown cmd";
 }

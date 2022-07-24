@@ -76,13 +76,24 @@ void db_client_op(
       q.erase( 0, 4 );
       assert( not user.empty() );
       reply = piac::db_add( user, db_name, std::move(q), my_hashes );
-      auto ndoc = piac::get_doccount( db_name );
-      MDEBUG( "Number of documents: " << ndoc );
+      MDEBUG( "Number of documents: " <<piac::get_doccount( db_name ) );
       db_update_hashes( db_name, my_hashes );
       zmqpp::message note;
       note << "NEW";
       db_rpc.send( note );
       MDEBUG( "Sent note on new documents" );
+
+    } else if (q[0]=='r' && q[1]=='m') {
+
+      q.erase( 0, 3 );
+      assert( not user.empty() );
+      reply = piac::db_rm( user, db_name, std::move(q), my_hashes );
+      MDEBUG( "Number of documents: " << piac::get_doccount( db_name ) );
+      db_update_hashes( db_name, my_hashes );
+      zmqpp::message note;
+      note << "NEW";
+      db_rpc.send( note );
+      MDEBUG( "Sent note on removed documents" );
 
     } else if (q[0]=='l' && q[1]=='i' && q[2]=='s' && q[3]=='t') {
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_set>
+
 // Logger macros: MFATAL, MERROR, MWARNING, MINFO, MDEBUG, MTRACE, etc.
 // See also <monero>/contrib/epee/include/misc_log_ex.h.
 
@@ -18,5 +20,7 @@ std::string sha256( const std::string& msg );
 std::string hex( const std::string& digest );
 
 void trim( std::string& s );
+
+std::unordered_set< std::string > tokenize( std::string& s );
 
 } // ::piac
