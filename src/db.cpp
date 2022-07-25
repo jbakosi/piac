@@ -291,6 +291,33 @@ piac::db_list_hash( const std::string& db_name, bool inhex ) {
 }
 
 // *****************************************************************************
+std::vector< std::string >
+piac::db_list_doc( const std::string& db_name ) {
+  std::vector< std::string > docs;
+  try {
+
+    Xapian::Database db( db_name );
+    Xapian::doccount dbsize = db.get_doccount();
+    if (dbsize == 0) return {};
+
+    for (auto it = db.postlist_begin({}); it != db.postlist_end({}); ++it) {
+      auto entry = db.get_document( *it ).get_data();
+      auto digest = sha256( entry );
+      Document d;
+      d.deserialize( entry );
+      d.author( hex( d.author() ) );
+      docs.emplace_back( hex( digest ) + ": " + d.serialize() );
+    }
+
+  } catch ( const Xapian::Error &e ) {
+    if (e.get_description().find("No such file") == std::string::npos)
+      MERROR( e.get_description() );
+  }
+
+  return docs;
+}
+
+// *****************************************************************************
 std::string
 piac::db_add( const std::string& author,
               const std::string& db_name,
@@ -329,7 +356,18 @@ std::string
 piac::db_list( const std::string& db_name, std::string&& cmd ) {
   trim( cmd );
   MDEBUG( "db list " + cmd );
-  if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
+
+  if (cmd.empty()) {
+
+    auto docs = db_list_doc( db_name );
+    std::string result( "Number of documents: " +
+                        std::to_string( docs.size() ) + '\n' );
+    for (auto&& d : docs) result += std::move(d) + '\n';
+    result.pop_back();
+    return result;
+
+  } else if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
+
     cmd.erase( 0, 5 );
     auto hashes = db_list_hash( db_name, /* inhex = */ true );
     std::string result( "Number of documents: " +
@@ -337,6 +375,8 @@ piac::db_list( const std::string& db_name, std::string&& cmd ) {
     for (auto&& h : hashes) result += std::move(h) + '\n';
     result.pop_back();
     return result;
+
   }
+
   return "unknown cmd";
 }

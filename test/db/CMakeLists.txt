@@ -44,6 +44,14 @@ set_tests_properties(cli_db_query PROPERTIES
                      DEPENDS cli_db_add_docs_json
                      LABELS "db")
 
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.docs" _in)
+add_test(NAME cli_db_list_docs
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_db_list_docs PROPERTIES PASS_REGULAR_EXPRESSION
+  "Bush Somerset Collection Bookcase"
+  DEPENDS cli_db_add_docs_json
+  LABELS "db")
+
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.hash" _in)
 add_test(NAME cli_db_list_hash
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
@@ -56,9 +64,9 @@ file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.rm1" _in)
 add_test(NAME cli_db_rm1
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_rm1 PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Removed 1 entries"
-                     DEPENDS "cli_db_add_docs_json;cli_db_list_hash"
-                     LABELS "db")
+  PASS_REGULAR_EXPRESSION "Removed 1 entries"
+  DEPENDS "cli_db_add_docs_json;cli_db_list_hash;cli_db_list_docs"
+  LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.add_docs_json" _in)
 add_test(NAME cli_db_add_back_docs_json
@@ -72,9 +80,9 @@ file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.rm2" _in)
 add_test(NAME cli_db_rm2
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_rm2 PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Removed 2 entries"
-                     DEPENDS "cli_db_add_back_docs_json;cli_db_list_hash"
-                     LABELS "db")
+  PASS_REGULAR_EXPRESSION "Removed 2 entries"
+  DEPENDS "cli_db_add_back_docs_json;cli_db_list_hash;cli_db_list_docs"
+  LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.rm1_noauth" _in)
 add_test(NAME cli_db_rm1_noauth
@@ -97,6 +105,7 @@ set_tests_properties(cli_db_connect
                      cli_db_add_rnd_json_entry
                      cli_db_query
                      cli_db_list_hash
+                     cli_db_list_docs
                      cli_db_rm1
                      cli_db_rm2
                      cli_db_rm1_noauth

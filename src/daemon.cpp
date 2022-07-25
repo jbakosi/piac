@@ -100,6 +100,10 @@ void db_client_op(
       q.erase( 0, 5 );
       reply = piac::db_list( db_name, std::move(q) );
 
+    } else {
+
+      reply = "unknown command";
+
     }
     client.send( reply );
 
