@@ -15,11 +15,19 @@ set_tests_properties(cli_db_connect PROPERTIES
                      LABELS "db")
 
 softlink( "${CMAKE_CURRENT_SOURCE_DIR}/docs.json" "${CMAKE_CURRENT_BINARY_DIR}" )
+
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.add_docs_json" _in)
 add_test(NAME cli_db_add_docs_json
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_add_docs_json PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Added [02] entries"
+                     PASS_REGULAR_EXPRESSION "Added [012] entries"
+                     LABELS "db")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.add_docs_json_other" _in)
+add_test(NAME cli_db_add_docs_json_other
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_db_add_docs_json_other PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Number of users: 2"
                      LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/entry.json" _out)
@@ -50,6 +58,14 @@ add_test(NAME cli_db_list_docs
 set_tests_properties(cli_db_list_docs PROPERTIES PASS_REGULAR_EXPRESSION
   "Bush Somerset Collection Bookcase"
   DEPENDS cli_db_add_docs_json
+  LABELS "db")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.numdoc" _in)
+add_test(NAME cli_db_list_numdoc
+         COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
+set_tests_properties(cli_db_list_numdoc PROPERTIES PASS_REGULAR_EXPRESSION
+  "Number of documents:"
+  DEPENDS "cli_db_add_docs_json_other"
   LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.hash" _in)
@@ -106,9 +122,11 @@ set_tests_properties(cli_db_connect
                      cli_db_query
                      cli_db_list_hash
                      cli_db_list_docs
+                     cli_db_list_numdoc
                      cli_db_rm1
                      cli_db_rm2
                      cli_db_rm1_noauth
                      cli_db_add_back_docs_json
+                     cli_db_add_docs_json_other
                      PROPERTIES FIXTURES_REQUIRED daemon_db)
 set_property(TEST kill_daemon_db PROPERTY FIXTURES_CLEANUP daemon_db)

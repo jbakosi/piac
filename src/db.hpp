@@ -195,6 +195,9 @@ db_list_hash( const std::string& db_name, bool inhex );
 [[nodiscard]] std::vector< std::string >
 db_list_doc( const std::string& db_name );
 
+[[nodiscard]] std::size_t
+db_list_numuser( const std::string& db_name );
+
 std::string
 db_add( const std::string& author,
         const std::string& db_name,

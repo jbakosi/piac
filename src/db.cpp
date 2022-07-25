@@ -318,6 +318,34 @@ piac::db_list_doc( const std::string& db_name ) {
 }
 
 // *****************************************************************************
+std::size_t
+piac::db_list_numuser( const std::string& db_name ) {
+  std::string stat;
+  try {
+
+    Xapian::Database db( db_name );
+    Xapian::doccount dbsize = db.get_doccount();
+    if (dbsize == 0) return {};
+
+    std::unordered_set< std::string > user;
+    for (auto it = db.postlist_begin({}); it != db.postlist_end({}); ++it) {
+      auto entry = db.get_document( *it ).get_data();
+      Document d;
+      d.deserialize( entry );
+      user.insert( d.author() );
+    }
+    return user.size();
+
+
+  } catch ( const Xapian::Error &e ) {
+    if (e.get_description().find("No such file") == std::string::npos)
+      MERROR( e.get_description() );
+  }
+
+  return {};
+}
+
+// *****************************************************************************
 std::string
 piac::db_add( const std::string& author,
               const std::string& db_name,
@@ -365,6 +393,18 @@ piac::db_list( const std::string& db_name, std::string&& cmd ) {
     for (auto&& d : docs) result += std::move(d) + '\n';
     result.pop_back();
     return result;
+
+  } else if (cmd[0]=='n' && cmd[1]=='u' && cmd[2]=='m' && cmd[3]=='d' &&
+             cmd[4]=='o' && cmd[5]=='c')
+  {
+
+    return "Number of documents: " + std::to_string( get_doccount( db_name ) );
+
+  } else if (cmd[0]=='n' && cmd[1]=='u' && cmd[2]=='m' && cmd[3]=='u' &&
+             cmd[4]=='s' && cmd[5]=='r')
+  {
+
+    return "Number of users: " + std::to_string( db_list_numuser( db_name ) );
 
   } else if (cmd[0]=='h' && cmd[1]=='a' && cmd[2]=='s' && cmd[3]=='h') {
 
