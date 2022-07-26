@@ -3,8 +3,12 @@
 #include <readline/readline.h>
 #include <getopt.h>
 
+#define MONERO
+
+#ifdef MONERO
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include "wallet/monero_wallet_full.h"
+#endif
 
 #include "project_config.hpp"
 #include "util.hpp"
@@ -58,8 +62,11 @@ void status( bool connected ) {
 // *****************************************************************************
 void send_cmd( bool connected,
                zmqpp::socket& server,
-               std::string cmd,
-               const std::unique_ptr< monero_wallet_full >& wallet )
+               std::string cmd
+               #ifdef MONERO
+             , const std::unique_ptr< monero_wallet_full >& wallet
+               #endif
+)
 {
   piac::trim( cmd );
   MDEBUG( cmd );
@@ -69,6 +76,7 @@ void send_cmd( bool connected,
     return;
   }
 
+  #ifdef MONERO
   // append author if cmd contains "db add/rm"
   auto npos = std::string::npos;
   if ( cmd.find("db") != npos &&
@@ -81,6 +89,7 @@ void send_cmd( bool connected,
     }
     cmd += " AUTH:" + piac::sha256( wallet->get_primary_address() );
   }
+  #endif
 
   // send message to server with command
   server.send( cmd );
@@ -104,6 +113,7 @@ std::string color_string( const std::string &s, COLOR color = GRAY ) {
   return ret + s + "\033[0m";
 }
 
+#ifdef MONERO
 // *****************************************************************************
 [[nodiscard]] std::unique_ptr< monero_wallet_full >
 create_wallet() {
@@ -155,6 +165,7 @@ void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
   }
   std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
 }
+#endif
 
 // ****************************************************************************
 [[nodiscard]] int wordcount( const std::string& s ) {
@@ -297,8 +308,10 @@ int main( int argc, char **argv ) {
   std::string host = "localhost:55090";
   bool connected = false;
 
+  #ifdef MONERO
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
+  #endif
 
   // initialize the zmq context with a single IO thread
   zmqpp::context context;
@@ -321,7 +334,11 @@ int main( int argc, char **argv ) {
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
+      #ifdef MONERO
       send_cmd( connected, server, buf, wallet );
+      #else
+      send_cmd( connected, server, buf );
+      #endif
 
     } else  if (!strcmp(buf,"disconnect")) {
 
@@ -391,15 +408,23 @@ int main( int argc, char **argv ) {
 
     } else if (!strcmp(buf,"keys")) {
 
+      #ifdef MONERO
       show_wallet_keys( wallet );
+      #endif
 
     } else if (!strcmp(buf,"new")) {
 
+      #ifdef MONERO
       wallet = create_wallet();
+      #endif
 
     } else if (!strcmp(buf,"peers")) {
 
+      #ifdef MONERO
       send_cmd( connected, server, "peers", nullptr );
+      #else
+      send_cmd( connected, server, "peers" );
+      #endif
 
     } else if (!strcmp(buf,"status")) {
 
@@ -407,6 +432,7 @@ int main( int argc, char **argv ) {
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
 
+      #ifdef MONERO
       std::string mnemonic( buf );
       mnemonic.erase( 0, 5 );
       if (mnemonic.empty()) {
@@ -416,6 +442,7 @@ int main( int argc, char **argv ) {
       } else {
         wallet = switch_user( mnemonic );
       }
+      #endif
 
     } else if (!strcmp(buf,"version")) {
 
