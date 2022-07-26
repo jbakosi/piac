@@ -9,18 +9,18 @@ This project is work-in-progress. Questions? Contact us on
 
 ## Planned features
 
-* Buy and sell products with [monero](https://getmonero.org)
+* Buy and sell with [monero](https://getmonero.org)
 * Decentralized distributed peer-to-peer marketplace
 * Pseudonymous identities
 * No tracking
 * No analytics
 * No KYC
 * No censorship
-* No registration required
+* No registration
 * No fees (except monero transaction fees and shipping costs)
 * Multi-signature escrowed transactions
-* End-to-end-encrypted messaging
-* Tor integration
+* End-to-end-encrypted connections and messaging
+* I2P and Tor integration
 * Reputation system
 * Product rating system
 * Wishlists
@@ -45,10 +45,10 @@ cd build && ctest
 ```sh
 # Run daemon
 cd piac/build
-./piac-daemon
+./piac-daemon --help
 # Run command-line client (in another terminal)
 cd piac/build
-./piac-cli
+./piac-cli --help
 ```
 
 ## Contribute
