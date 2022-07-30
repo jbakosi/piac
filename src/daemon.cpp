@@ -9,7 +9,8 @@
 #include <unistd.h>
 
 #include "project_config.hpp"
-#include "util.hpp"
+#include "crypto_util.hpp"
+#include "logging_util.hpp"
 #include "db.hpp"
 
 std::mutex g_hashes_mtx;
@@ -56,9 +57,8 @@ void db_client_op(
   if (cmd == "connect") {
 
     zmqpp::message reply;
-    std::string accept( "accept" );
-    reply << accept;
-    MDEBUG( "Sending reply '" << accept << "'" );
+    reply << "accept";
+    MDEBUG( "Sending reply " << cmd );
     client.send( reply );
 
   } else if (cmd[0]=='d' && cmd[1]=='b') {
@@ -109,10 +109,14 @@ void db_client_op(
 
   } else if (cmd == "peers") {
 
-    std::stringstream peers_list;
-    for (const auto& [addr,sock] : my_peers) peers_list << addr << ' ';
     zmqpp::message reply;
-    reply << peers_list.str();
+    if (not my_peers.empty()) {
+      std::stringstream peers_list;
+      for (const auto& [addr,sock] : my_peers) peers_list << addr << ' ';
+      reply << peers_list.str();
+    } else {
+      reply << "No peers";
+    }
     client.send( reply );
 
   } else {
@@ -233,6 +237,9 @@ db_thread( zmqpp::context& ctx,
   zmqpp::socket client( ctx, zmqpp::socket_type::reply );
   try_bind( client, server_port, 10, use_strict_ports );
   MINFO( "Bound to port " << server_port );
+  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
+  std::cout << "Server bound to port " << server_port << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   // create socket that will listen to requests for db lookups from peers
   zmqpp::socket db_rpc( ctx, zmqpp::socket_type::pair );
@@ -753,7 +760,10 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
-  std::cout << version << '\n' <<
+  epee::set_console_color( epee::console_color_green, /* bright = */ false );
+  std::cout << version << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
+  std::cout <<
     "Welcome to piac, where anyone can buy and sell anything privately and\n"
     "securely using the private digital cash, monero. For more information\n"
     "on monero, see https://getmonero.org. This is the server of piac. It\n"

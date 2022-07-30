@@ -117,12 +117,31 @@ install(TARGETS db
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
-add_library(util ${PIAC_SOURCE_DIR}/util.cpp)
-target_include_directories(util PUBLIC ${PIAC_SOURCE_DIR}
-                                       ${TPL_DIR}/include
-                                       ${cryptopp_INCLUDE_DIRS})
-set_target_properties(util PROPERTIES LIBRARY_OUTPUT_NAME piac_util)
-install(TARGETS util
+add_library(logging_util ${PIAC_SOURCE_DIR}/logging_util.cpp)
+target_include_directories(logging_util PUBLIC ${PIAC_SOURCE_DIR}
+                                               ${TPL_DIR}/include)
+set_target_properties(logging_util
+                      PROPERTIES LIBRARY_OUTPUT_NAME piac_logging_util)
+install(TARGETS logging_util
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+add_library(crypto_util ${PIAC_SOURCE_DIR}/crypto_util.cpp)
+target_include_directories(crypto_util PUBLIC ${PIAC_SOURCE_DIR}
+                                              ${cryptopp_INCLUDE_DIRS})
+set_target_properties(crypto_util
+                      PROPERTIES LIBRARY_OUTPUT_NAME piac_crypto_util)
+install(TARGETS crypto_util
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+add_library(string_util ${PIAC_SOURCE_DIR}/string_util.cpp)
+target_include_directories(string_util PUBLIC ${PIAC_SOURCE_DIR})
+set_target_properties(string_util
+                      PROPERTIES LIBRARY_OUTPUT_NAME piac_string_util)
+install(TARGETS string_util
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
@@ -138,7 +157,10 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
-                      db util
+                      db
+                      logging_util
+                      string_util
+                      crypto_util
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}
@@ -164,7 +186,9 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
-                      util
+                      logging_util
+                      crypto_util
+                      string_util
                       ${ZMQPP_LIBRARIES}
                       ${Readline_LIBRARY}
                       ${Boost_SERIALIZATION_LIBRARY}

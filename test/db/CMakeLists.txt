@@ -11,8 +11,8 @@ file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55092" _in)
 add_test(NAME cli_db_connect
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_connect PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Connected"
-                     LABELS "db")
+  PASS_REGULAR_EXPRESSION "Will send commands to daemon at localhost:55090"
+  LABELS "db")
 
 softlink( "${CMAKE_CURRENT_SOURCE_DIR}/docs.json" "${CMAKE_CURRENT_BINARY_DIR}" )
 

@@ -2,6 +2,7 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <getopt.h>
+#include <unistd.h>
 
 #define MONERO
 
@@ -11,58 +12,75 @@
 #endif
 
 #include "project_config.hpp"
-#include "util.hpp"
+#include "string_util.hpp"
+#include "crypto_util.hpp"
+#include "logging_util.hpp"
+
+#define REQUEST_TIMEOUT     3000   //  msecs, (> 1000!)
+#define REQUEST_RETRIES     5      //  before we abandon trying to send
 
 // *****************************************************************************
-void disconnect( bool& connected,
-                 zmqpp::socket& server,
-                 const std::string& host )
-{
-  MDEBUG( "disconnect" );
-  if (connected) {
-    server.disconnect( "tcp://" + host );
-    std::cout << "Disconnected\n";
-  } else {
-    std::cout << "Not connected\n";
-  }
-  connected = false;
+zmqpp::socket
+daemon_socket( zmqpp::context& ctx, const std::string& host ) {
+  MINFO( "Connecting to " << host );
+  auto sock = zmqpp::socket( ctx, zmqpp::socket_type::req );
+  sock.connect( "tcp://" + host );
+  //  configure socket to not wait at close time
+  sock.set( zmqpp::socket_option::linger, 0 );
+  return sock;
 }
 
 // *****************************************************************************
-void connect( bool& connected, zmqpp::socket& server, const std::string& host )
+std::string
+pirate_send( const std::string& cmd,
+            zmqpp::context& ctx,
+            const std::string& host )
 {
-  MDEBUG( "connect" );
-  if (connected) {
-    std::cout << "You need to disconnect first\n";
-    return;
-  }
-  std::cout << "Connecting to '" + piac::daemon_executable() << "' at " << host
-            << '\n';
-  server.connect( "tcp://" + host );
-  server.send( "connect" );
-  // wait for reply from server
   std::string reply;
-  auto res = server.receive( reply );
-  MDEBUG( reply );
-  if (reply == "accept") {
-    std::cout << "Connected\n";
-    connected = true;
+  int retries = REQUEST_RETRIES;
+  auto server = daemon_socket( ctx, host );
+
+  // send cmd from a Lazy Pirate client
+  while (retries) {
+    std::string request = cmd;
+    server.send( request );
+    if (retries != REQUEST_RETRIES) sleep(1);
+
+    zmqpp::poller poller;
+    poller.add( server );
+    bool expect_reply = true;
+    while (expect_reply) {
+      if (poller.poll(REQUEST_TIMEOUT) && poller.has_input(server)) {
+        server.receive( reply );
+        if (not reply.empty()) {
+          MDEBUG( "Recv reply: " + reply );
+          expect_reply = false;
+          retries = 0;
+        } else {
+          MERROR( "Recv empty msg from daemon" );
+        }
+      } else if (--retries == 0) {
+        MERROR( "Abandoning server at " + host );
+        reply = "No response from server";
+        expect_reply = false;
+      } else {
+        MWARNING( "No response from " + host + ", retrying: " << retries );
+        poller.remove( server );
+        server = daemon_socket( ctx, host );
+        poller.add( server );
+        server.send( request );
+      }
+    }
   }
+
+  MDEBUG( "Destroyed socket to " + host );
+  return reply;
 }
 
 // *****************************************************************************
-void status( bool connected ) {
-  MDEBUG( "status" );
-  if (connected)
-    std::cout << "Connected\n";
-  else
-    std::cout << "Not connected\n";
-}
-
-// *****************************************************************************
-void send_cmd( bool connected,
-               zmqpp::socket& server,
-               std::string cmd
+void send_cmd( std::string cmd,
+               zmqpp::context& ctx,
+               const std::string& host
                #ifdef MONERO
              , const std::unique_ptr< monero_wallet_full >& wallet
                #endif
@@ -70,11 +88,6 @@ void send_cmd( bool connected,
 {
   piac::trim( cmd );
   MDEBUG( cmd );
-  if (not connected) {
-    std::cout << "Not connected. Use 'connect' to connect to "
-               << piac::daemon_executable() << ".\n";
-    return;
-  }
 
   #ifdef MONERO
   // append author if cmd contains "db add/rm"
@@ -91,13 +104,9 @@ void send_cmd( bool connected,
   }
   #endif
 
-  // send message to server with command
-  server.send( cmd );
-  // wait for reply from server
-  std::string reply;
-  auto res = server.receive( reply );
+  // send message to daemon with command
+  auto reply = pirate_send( cmd, ctx, host );
   std::cout << reply << '\n';
-  MDEBUG( reply );
 }
 
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
@@ -295,7 +304,10 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
-  std::cout << version << '\n' <<
+  epee::set_console_color( epee::console_color_green, /* bright = */ false );
+  std::cout << version << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
+  std::cout <<
     "Welcome to piac, where anyone can buy and sell anything privately and\n"
     "securely using the private digital cash, monero. For more information\n"
     "on monero, see https://getmonero.org. This is the command line client\n"
@@ -306,43 +318,46 @@ int main( int argc, char **argv ) {
                        max_log_file_size, max_log_files );
 
   std::string host = "localhost:55090";
-  bool connected = false;
+  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
+  std::cout << "Will send commands to daemon at " << host << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   #ifdef MONERO
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
   #endif
 
-  // initialize the zmq context with a single IO thread
-  zmqpp::context context;
-  // construct a REQ (request) socket
-  zmqpp::socket server{ context, zmqpp::socket_type::req };
+  MLOG_SET_THREAD_NAME( "cli" );
+
+  // initialize (thread-safe) zmq context
+  zmqpp::context ctx;
 
   char* buf;
-  std::string prompt = color_string( piac::cli_executable(),GREEN ) +
+  std::string prompt = color_string( "piac", GREEN ) +
                        color_string( "> ",YELLOW );
 
   while ((buf = readline( prompt.c_str() ) ) != nullptr) {
 
-    if (buf[0]=='c' && buf[1]=='o' && buf[2]=='n' && buf[3]=='n' &&
-        buf[4]=='e' && buf[5]=='c' && buf[6]=='t')
+    if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
+        buf[4]=='e' && buf[5]=='r')
     {
+
       std::string b( buf );
-      b.erase( 0, 8 );
+      b.erase( 0, 7 );
       if (not b.empty()) host = b;
-      connect( connected, server, host );
+      epee::set_console_color( epee::console_color_yellow,
+                               /* bright = */ false );
+      std::cout << "Will send commands to daemon at " << host << '\n';
+      epee::set_console_color( epee::console_color_default,
+                               /* bright = */ false );
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
       #ifdef MONERO
-      send_cmd( connected, server, buf, wallet );
+      send_cmd( buf, ctx, host, wallet );
       #else
-      send_cmd( connected, server, buf );
+      send_cmd( buf, ctx, host );
       #endif
-
-    } else  if (!strcmp(buf,"disconnect")) {
-
-      disconnect( connected, server, host );
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
@@ -353,19 +368,17 @@ int main( int argc, char **argv ) {
 
       std::cout << "COMMANDS\n"
 
-        "      connect [<host>[:<port>]]\n"
-        "                Connect to a " + piac::daemon_executable() + "."
-                        "The optional <host> argument specifies\n"
+        "      server <host>[:<port>]\n"
+        "                Specify server to send commands to. The <host> "
+                        "argument specifies\n"
         "                a hostname or an IPv4 address in standard dot "
                          "notation. See\n"
         "                'man gethostbyname'. The optional <port> argument is "
                         "an\n"
-        "                integer specifying a port.\n\n"
+        "                integer specifying a port. The default is " + host +
+                        ".\n\n"
         "      db <command>\n"
-        "                Send database command to " + piac::daemon_executable()
-                         + ". You must have connected to\n"
-        "                a " + piac::daemon_executable() + " first. See "
-                        "'connect'. Example db commands:\n"
+        "                Send database command to daemon. Example db commands:\n"
         "                > db query cat - search for the word 'cat'\n"
         "                > db query race -condition - search for 'race' but "
                         "not 'condition'\n"
@@ -375,8 +388,6 @@ int main( int argc, char **argv ) {
         "                > db list hash - list all document hashes\n"
         "                > db list numdoc - list number of documents\n"
         "                > db list numusr - list number of users in db\n\n"
-        "      disconnect\n"
-	"                Disconnect from a " + piac::daemon_executable() + "\n\n"
         "      exit, quit, q\n"
         "                Exit\n\n"
         "      help\n"
@@ -393,12 +404,7 @@ int main( int argc, char **argv ) {
         "                If you want to use your existing monero wallet, see "
                         "'user'.\n\n"
         "      peers\n"
-        "                List peers of " + piac::daemon_executable() + ". You "
-                        "must have connected to a " + piac::daemon_executable()
-                         + "\n"
-        "                first. See 'connect'.\n\n"
-        "      status\n"
-	"                Query status\n\n"
+        "                List server peers\n\n"
         "      user [<mnemonic>]\n"
 	"                Show active monero wallet mnemonic seed (user id) if "
                         "no mnemonic is\n"
@@ -421,14 +427,10 @@ int main( int argc, char **argv ) {
     } else if (!strcmp(buf,"peers")) {
 
       #ifdef MONERO
-      send_cmd( connected, server, "peers", nullptr );
+      send_cmd( "peers", ctx, host, wallet );
       #else
-      send_cmd( connected, server, "peers" );
+      send_cmd( "peers", ctx, host );
       #endif
-
-    } else if (!strcmp(buf,"status")) {
-
-      status( connected );
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
 
@@ -460,7 +462,6 @@ int main( int argc, char **argv ) {
     free( buf );
   }
 
-  if (connected) disconnect( connected, server, host );
   MDEBUG( "graceful exit" );
 
   return EXIT_SUCCESS;

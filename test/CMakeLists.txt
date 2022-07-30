@@ -12,6 +12,7 @@ endfunction()
 
 # configure helper executable to kill daemon
 add_executable(kill_daemon kill_daemon.cpp)
+
 # configure helper executable to generate a random json db entry
 add_executable(rnd_json_entry rnd_json_entry.cpp)
 

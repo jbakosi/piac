@@ -1,3 +1,3 @@
-connect localhost:56091
+server localhost:56091
 peers
 exit
