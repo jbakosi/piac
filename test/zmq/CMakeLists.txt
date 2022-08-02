@@ -56,18 +56,18 @@ set_tests_properties(cli_zmq_help PROPERTIES
 # start 3 daemons in background, run cli tests, kill daemons
 # https://discourse.cmake.org/t/ctest-able-to-daemonize-fixtures/1012
 add_test(NAME daemon_zmq_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 55091 --rpc-port 65091)
+         --detach --rpc-bind-port 55091 --p2p-bind-port 65091)
 set_tests_properties(daemon_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "zmq")
 add_test(NAME daemon2_zmq_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 56091 --rpc-port 47091 --peer localhost:65091
+         --detach --rpc-bind-port 56091 --p2p-bind-port 47091 --peer localhost:65091
          --log-file ${DAEMON_EXECUTABLE}.47091.log)
 set_tests_properties(daemon2_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "zmq")
 add_test(NAME daemon3_zmq_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 57091 --rpc-port 37091 --peer localhost:65091
+         --detach --rpc-bind-port 57091 --p2p-bind-port 37091 --peer localhost:65091
          --log-file ${DAEMON_EXECUTABLE}.37091.log)
 set_tests_properties(daemon3_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"

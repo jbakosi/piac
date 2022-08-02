@@ -2,7 +2,7 @@
 
 # start daemon in background, run cli tests, kill daemon
 add_test(NAME daemon_db_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 55092 --rpc-port 65092)
+         --detach --rpc-bind-port 55092 --p2p-bind-port 65092)
 set_tests_properties(daemon_db_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "db")

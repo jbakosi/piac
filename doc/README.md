@@ -73,9 +73,8 @@ piac-cli> help
 The daemon is threaded so it can use multiple CPU cores. At this time, there
 are two different threads
 
-1. RPC, used to communicate with peers. (Source code associated with this
-   thread is labeled by `rpc`, for _remote procedure call_ or _remote process
-   communication_.)
+1. P2P, used to communicate with peers. (Source code associated with this
+   thread is labeled by `p2p`)
 2. DB, used for dealing with the ad database. (Source code associated with this
    thread is labeled by `db`.)
 
@@ -91,7 +90,7 @@ zmq's [inproc](http://api.zeromq.org/master:zmq-inproc) transport using the
    |    /      |                              |    /      |
    |    \      |  PAIR                 PAIR   |    \      |
    |           | (connect)            (bind)  |           |
-   |   RPC   <--------------------------------->   DB     |
+   |   P2P   <--------------------------------->   DB     |
    |  THREAD   |                              |  THREAD   |
    |           |                              |           |
    |    \      |                              |    \      |

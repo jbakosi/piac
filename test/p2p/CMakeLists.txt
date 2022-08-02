@@ -19,18 +19,18 @@ set_tests_properties(daemon_arg_bad PROPERTIES
 # start 3 daemons in background, run cli tests, kill daemons
 # https://discourse.cmake.org/t/ctest-able-to-daemonize-fixtures/1012
 add_test(NAME daemon_p2p_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 36091 --rpc-port 35091)
+         --detach --rpc-bind-port 36091 --p2p-bind-port 35091)
 set_tests_properties(daemon_p2p_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "p2p")
 add_test(NAME daemon2_p2p_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 33091 --rpc-port 27091 --peer localhost:35091
+         --detach --rpc-bind-port 33091 --p2p-bind-port 27091 --peer localhost:35091
          --log-file ${DAEMON_EXECUTABLE}.27091.log --db daemon2)
 set_tests_properties(daemon2_p2p_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "p2p")
 add_test(NAME daemon3_p2p_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --port 23091 --rpc-port 17091 --peer localhost:35091
+         --detach --rpc-bind-port 23091 --p2p-bind-port 17091 --peer localhost:35091
          --log-file ${DAEMON_EXECUTABLE}.17091.log --db daemon3)
 set_tests_properties(daemon3_p2p_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"

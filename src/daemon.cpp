@@ -35,7 +35,7 @@ db_update_hashes( const std::string& db_name,
 // *****************************************************************************
 void db_client_op(
   zmqpp::socket& client,
-  zmqpp::socket& db_rpc,
+  zmqpp::socket& db_p2p,
   const std::string& db_name,
   const std::unordered_map< std::string, zmqpp::socket >& my_peers,
   std::unordered_set< std::string >& my_hashes,
@@ -80,7 +80,7 @@ void db_client_op(
       db_update_hashes( db_name, my_hashes );
       zmqpp::message note;
       note << "NEW";
-      db_rpc.send( note );
+      db_p2p.send( note );
       MDEBUG( "Sent note on new documents" );
 
     } else if (q[0]=='r' && q[1]=='m') {
@@ -92,7 +92,7 @@ void db_client_op(
       db_update_hashes( db_name, my_hashes );
       zmqpp::message note;
       note << "NEW";
-      db_rpc.send( note );
+      db_p2p.send( note );
       MDEBUG( "Sent note on removed documents" );
 
     } else if (q[0]=='l' && q[1]=='i' && q[2]=='s' && q[3]=='t') {
@@ -131,7 +131,7 @@ void db_client_op(
 void
 db_peer_op( const std::string& db_name,
             zmqpp::message& msg,
-            zmqpp::socket& db_rpc,
+            zmqpp::socket& db_p2p,
             std::unordered_set< std::string >& my_hashes )
 {
   std::string cmd;
@@ -157,7 +157,7 @@ db_peer_op( const std::string& db_name,
     zmqpp::message reply;
     reply << "PUT" << addr << std::to_string( docs.size() );
     for (const auto& d : docs) reply << d;
-    db_rpc.send( reply );
+    db_p2p.send( reply );
     MDEBUG( "Sending " << docs.size() << " entries" );
 
   } else if (cmd == "INS") {
@@ -183,7 +183,7 @@ db_peer_op( const std::string& db_name,
       db_update_hashes( db_name, my_hashes );
       zmqpp::message reply;
       reply << "NEW";
-      db_rpc.send( reply );
+      db_p2p.send( reply );
       MDEBUG( "Sent note on new documents" );
     }
 
@@ -217,7 +217,7 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
 void
 db_thread( zmqpp::context& ctx,
            const std::string& db_name,
-           int server_port,
+           int rpc_port,
            bool use_strict_ports,
            const std::unordered_map< std::string, zmqpp::socket >& my_peers,
            std::unordered_set< std::string >& my_hashes )
@@ -235,32 +235,32 @@ db_thread( zmqpp::context& ctx,
 
   // create socket that will listen to clients and bind to server port
   zmqpp::socket client( ctx, zmqpp::socket_type::reply );
-  try_bind( client, server_port, 10, use_strict_ports );
-  MINFO( "Bound to port " << server_port );
+  try_bind( client, rpc_port, 10, use_strict_ports );
+  MINFO( "Bound to RPC port " << rpc_port );
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << "Server bound to port " << server_port << '\n';
+  std::cout << "Bound to RPC port " << rpc_port << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   // create socket that will listen to requests for db lookups from peers
-  zmqpp::socket db_rpc( ctx, zmqpp::socket_type::pair );
-  db_rpc.bind( "inproc://db_rpc" );
-  MDEBUG( "Bound to inproc:://db_rpc" );
+  zmqpp::socket db_p2p( ctx, zmqpp::socket_type::pair );
+  db_p2p.bind( "inproc://db_p2p" );
+  MDEBUG( "Bound to inproc:://db_p2p" );
 
   // listen to messages
   zmqpp::poller poller;
-  poller.add( db_rpc );
+  poller.add( db_p2p );
   while (1) {
 
     zmqpp::message msg;
     if (client.receive( msg, /* dont_block = */ true )) {
-      db_client_op( client, db_rpc, db_name, my_peers, my_hashes, msg );
+      db_client_op( client, db_p2p, db_name, my_peers, my_hashes, msg );
     }
 
     if (poller.poll(100)) {
-      if (poller.has_input( db_rpc )) {
+      if (poller.has_input( db_p2p )) {
         zmqpp::message msg;
-        db_rpc.receive( msg );
-        db_peer_op( db_name, msg, db_rpc, my_hashes );
+        db_p2p.receive( msg );
+        db_peer_op( db_name, msg, db_p2p, my_hashes );
       }
     }
   }
@@ -268,7 +268,7 @@ db_thread( zmqpp::context& ctx,
 
 // *****************************************************************************
 zmqpp::socket
-connect( zmqpp::context& ctx, const std::string& addr, int rpc_port ) {
+connect( zmqpp::context& ctx, const std::string& addr, int p2p_port ) {
   // create socket to connect to peers at their rpc port
   zmqpp::socket dealer( ctx, zmqpp::socket_type::dealer );
   dealer.connect( "tcp://" + addr );
@@ -278,7 +278,7 @@ connect( zmqpp::context& ctx, const std::string& addr, int rpc_port ) {
 
 // *****************************************************************************
 void
-rpc_bcast_peers( int rpc_port,
+p2p_bcast_peers( int p2p_port,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
                  bool& to_bcast_peers )
 {
@@ -288,7 +288,7 @@ rpc_bcast_peers( int rpc_port,
     zmqpp::message msg;
     msg << "PEER";
     msg << std::to_string( my_peers.size() + 1 );
-    msg << "localhost:" + std::to_string(rpc_port);
+    msg << "localhost:" + std::to_string(p2p_port);
     for (const auto& [taddr,sock] : my_peers) msg << taddr;
     sock.send( msg );
   }
@@ -298,7 +298,7 @@ rpc_bcast_peers( int rpc_port,
 
 // *****************************************************************************
 void
-rpc_bcast_hashes( int rpc_port,
+p2p_bcast_hashes( int p2p_port,
                   std::unordered_map< std::string, zmqpp::socket >& my_peers,
                   const std::unordered_set< std::string >& my_hashes,
                   bool& to_bcast_hashes )
@@ -313,7 +313,7 @@ rpc_bcast_hashes( int rpc_port,
   for (auto& [addr,sock] : my_peers) {
     zmqpp::message msg;
     msg << "HASH";
-    msg << "localhost:" + std::to_string(rpc_port);
+    msg << "localhost:" + std::to_string(p2p_port);
     msg << std::to_string( my_hashes.size() );
     for (const auto& h : my_hashes) msg << h;
     sock.send( msg );
@@ -325,8 +325,8 @@ rpc_bcast_hashes( int rpc_port,
 
 // *****************************************************************************
 void
-rpc_send_db_requests(
-  int rpc_port,
+p2p_send_db_requests(
+  int p2p_port,
   std::unordered_map< std::string, zmqpp::socket >& my_peers,
   std::unordered_map< std::string,
     std::unordered_set< std::string > >& db_requests,
@@ -337,7 +337,7 @@ rpc_send_db_requests(
   for (auto&& [addr,hashes] : db_requests) {
     zmqpp::message msg;
     msg << "REQ";
-    msg << "localhost:" + std::to_string(rpc_port);
+    msg << "localhost:" + std::to_string(p2p_port);
     msg << std::to_string( hashes.size() );
     for (const auto& h : hashes) msg << h;
     hashes.clear();
@@ -350,14 +350,14 @@ rpc_send_db_requests(
 
 // *****************************************************************************
 void
-rpc_answer_rpc( zmqpp::context& ctx,
+p2p_answer_rpc( zmqpp::context& ctx,
                 zmqpp::message& msg,
-                zmqpp::socket& db_rpc,
+                zmqpp::socket& db_p2p,
                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
                 const std::unordered_set< std::string >& my_hashes,
                 std::unordered_map< std::string,
                   std::unordered_set< std::string > >& db_requests,
-                int rpc_port,
+                int p2p_port,
                 bool& to_bcast_peers,
                 bool& to_bcast_hashes,
                 bool& to_send_db_requests )
@@ -374,10 +374,10 @@ rpc_answer_rpc( zmqpp::context& ctx,
     while (num-- != 0) {
       std::string addr;
       msg >> addr;
-      if (addr != "localhost:" + std::to_string(rpc_port) &&
+      if (addr != "localhost:" + std::to_string(p2p_port) &&
           my_peers.find(addr) == end(my_peers))
       {
-        my_peers.emplace( addr, connect( ctx, addr, rpc_port ) );
+        my_peers.emplace( addr, connect( ctx, addr, p2p_port ) );
         to_bcast_peers = true;
         to_bcast_hashes = true;
       }
@@ -418,7 +418,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
       msg >> hash;
       req << hash;
     }
-    db_rpc.send( req );
+    db_p2p.send( req );
     MDEBUG( "Will prepare " << size << " db entries for " << addr );
 
   } else if (cmd == "DOC") {
@@ -444,7 +444,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
     zmqpp::message req;
     req << "INS" << std::to_string( docs_to_insert.size() );
     for (const auto& doc : docs_to_insert) req << doc;
-    db_rpc.send( req );
+    db_p2p.send( req );
     MDEBUG( "Attempting to insert " << docs_to_insert.size() << " db entries" );
 
   } else {
@@ -455,7 +455,7 @@ rpc_answer_rpc( zmqpp::context& ctx,
 }
 
 void
-rpc_answer_ipc( zmqpp::message& msg,
+p2p_answer_ipc( zmqpp::message& msg,
                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
                 bool& to_bcast_hashes )
 {
@@ -492,11 +492,11 @@ rpc_answer_ipc( zmqpp::message& msg,
 }
 
 // *****************************************************************************
-void rpc_thread( zmqpp::context& ctx,
+void p2p_thread( zmqpp::context& ctx,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
                  const std::unordered_set< std::string >& my_hashes,
-                 int default_rpc_port,
-                 int rpc_port,
+                 int default_p2p_port,
+                 int p2p_port,
                  bool use_strict_ports )
 {
   MLOG_SET_THREAD_NAME( "rpc" );
@@ -504,17 +504,17 @@ void rpc_thread( zmqpp::context& ctx,
 
   // create socket that will listen to peers and bind to rpc port
   zmqpp::socket router( ctx, zmqpp::socket_type::router );
-  try_bind( router, rpc_port, 10, use_strict_ports );
-  MINFO( "Bound to RPC port " << rpc_port );
+  try_bind( router, p2p_port, 10, use_strict_ports );
+  MINFO( "Bound to P2P port " << p2p_port );
 
   // remove our address from peer list
-  my_peers.erase( "localhost:" + std::to_string(rpc_port) );
+  my_peers.erase( "localhost:" + std::to_string(p2p_port) );
   // add default peers
-  for (int p = default_rpc_port; p < rpc_port; ++p)
+  for (int p = default_p2p_port; p < p2p_port; ++p)
     my_peers.emplace( "localhost:" + std::to_string( p ),
                       zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
   // initially connect to peers
-  for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, rpc_port );
+  for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, p2p_port );
   MDEBUG( "Initial number of peers: " << my_peers.size() );
 
   { // log initial number of hashes (populated by db thread)
@@ -524,9 +524,9 @@ void rpc_thread( zmqpp::context& ctx,
   MDEBUG( "Initial number of db hashes: " << my_hashes.size() );
 
   // create socket to send requests for db lookups from peers
-  zmqpp::socket db_rpc( ctx, zmqpp::socket_type::pair );
-  db_rpc.connect( "inproc://db_rpc" );
-  MDEBUG( "Connected to inproc:://db_rpc" );
+  zmqpp::socket db_p2p( ctx, zmqpp::socket_type::pair );
+  db_p2p.connect( "inproc://db_p2p" );
+  MDEBUG( "Connected to inproc:://db_p2p" );
 
   std::unordered_map< std::string, std::unordered_set< std::string > >
     db_requests;
@@ -534,29 +534,29 @@ void rpc_thread( zmqpp::context& ctx,
   // listen to peers
   zmqpp::poller poller;
   poller.add( router );
-  poller.add( db_rpc );
+  poller.add( db_p2p );
   bool to_bcast_peers = true;
   bool to_bcast_hashes = true;
   bool to_send_db_requests = false;
 
   while (1) {
-    rpc_bcast_peers( rpc_port, my_peers, to_bcast_peers );
-    rpc_bcast_hashes( rpc_port, my_peers, my_hashes, to_bcast_hashes );
-    rpc_send_db_requests( rpc_port, my_peers, db_requests,
+    p2p_bcast_peers( p2p_port, my_peers, to_bcast_peers );
+    p2p_bcast_hashes( p2p_port, my_peers, my_hashes, to_bcast_hashes );
+    p2p_send_db_requests( p2p_port, my_peers, db_requests,
                           to_send_db_requests );
 
     if (poller.poll()) {
       if (poller.has_input( router )) {
         zmqpp::message msg;
         router.receive( msg );
-        rpc_answer_rpc( ctx, msg, db_rpc, my_peers, my_hashes, db_requests,
-                        rpc_port, to_bcast_peers, to_bcast_hashes,
+        p2p_answer_rpc( ctx, msg, db_p2p, my_peers, my_hashes, db_requests,
+                        p2p_port, to_bcast_peers, to_bcast_hashes,
                         to_send_db_requests );
       }
-      if (poller.has_input( db_rpc )) {
+      if (poller.has_input( db_p2p )) {
         zmqpp::message msg;
-        db_rpc.receive( msg );
-        rpc_answer_ipc( msg, my_peers, to_bcast_hashes );
+        db_p2p.receive( msg );
+        p2p_answer_ipc( msg, my_peers, to_bcast_hashes );
       }
     }
   }
@@ -605,9 +605,9 @@ int main( int argc, char **argv ) {
   }
 
   // Defaults
-  int server_port = 55090;
-  int default_rpc_port = 65090;
-  int rpc_port = default_rpc_port;
+  int rpc_port = 55090;         // used for client/server communication
+  int default_p2p_port = 65090; // used for peer-to-peer communication
+  int p2p_port = default_p2p_port;
   bool use_strict_ports = false;
   std::string db_name( "piac.db" );
   std::string logfile( piac::daemon_executable() + ".log" );
@@ -629,8 +629,8 @@ int main( int argc, char **argv ) {
   const int ARG_MAX_LOG_FILE_SIZE = 1004;
   const int ARG_MAX_LOG_FILES     = 1005;
   const int ARG_PEER              = 1006;
-  const int ARG_PORT              = 1007;
-  const int ARG_RPC_PORT          = 1008;
+  const int ARG_RPC_PORT          = 1007;
+  const int ARG_P2P_PORT          = 1008;
   const int ARG_VERSION           = 1009;
   static struct option long_options[] =
     { // NAME               ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
@@ -642,8 +642,8 @@ int main( int argc, char **argv ) {
       {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE},
       {"max-log-files",     required_argument, 0,       ARG_MAX_LOG_FILES    },
       {"peer",              required_argument, 0,       ARG_PEER             },
-      {"port",              required_argument, 0,       ARG_PORT             },
-      {"rpc-port",          required_argument, 0,       ARG_RPC_PORT         },
+      {"rpc-bind-port",     required_argument, 0,       ARG_RPC_PORT         },
+      {"p2p-bind-port",     required_argument, 0,       ARG_P2P_PORT         },
       {"version",           no_argument,       0,       ARG_VERSION          },
       {0, 0, 0, 0}
     };
@@ -686,12 +686,12 @@ int main( int argc, char **argv ) {
           "         established solutions like logrotate instead.\n\n"
           "  --peer <hostname>[:port]\n"
           "         Specify a peer to connect to\n\n"
-          "  --port <port>\n"
-          "         Listen on server port given, default: "
-                  + std::to_string( server_port ) + "\n\n"
-          "  --rpc-port <port>\n"
+          "  --rpc-bind-port <port>\n"
           "         Listen on RPC port given, default: "
                   + std::to_string( rpc_port ) + "\n\n"
+          "  --p2p-bind-port <port>\n"
+          "         Listen on P2P port given, default: "
+                  + std::to_string( p2p_port ) + "\n\n"
           "  --version\n"
           "         Show version information\n\n";
         return EXIT_SUCCESS;
@@ -702,15 +702,15 @@ int main( int argc, char **argv ) {
         break;
       }
 
-      case ARG_PORT: {
-        server_port = atoi( optarg );
+      case ARG_RPC_PORT: {
+        rpc_port = atoi( optarg );
         use_strict_ports = true;
         break;
       }
 
-      case ARG_RPC_PORT: {
-        default_rpc_port = atoi( optarg );
-        rpc_port = default_rpc_port;
+      case ARG_P2P_PORT: {
+        default_p2p_port = atoi( optarg );
+        p2p_port = default_p2p_port;
         use_strict_ports = true;
         break;
       }
@@ -793,12 +793,12 @@ int main( int argc, char **argv ) {
   // start threads
   std::vector< std::thread > threads;
 
-  threads.emplace_back( rpc_thread,
-    std::ref(ctx), std::ref(my_peers), std::ref(my_hashes), default_rpc_port,
-    rpc_port, use_strict_ports );
+  threads.emplace_back( p2p_thread,
+    std::ref(ctx), std::ref(my_peers), std::ref(my_hashes), default_p2p_port,
+    p2p_port, use_strict_ports );
 
   threads.emplace_back( db_thread,
-    std::ref(ctx), db_name, server_port, use_strict_ports, std::ref(my_peers),
+    std::ref(ctx), db_name, rpc_port, use_strict_ports, std::ref(my_peers),
     std::ref(my_hashes) );
 
   // wait for all threads to finish
