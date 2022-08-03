@@ -1,65 +1,65 @@
 # Overall status
 
-Basic p2p communication among multiple daemons works and routinely tested. Some details:
+Basic p2p communication among multiple daemons works and routinely tested. Some
+details:
 
-* Networking and threading code is fully asynchronous.
+Networking and threading code is fully asynchronous.
 
-* The daemon is threaded, i.e., can use multiple cores: one thread interrogates
-  the database, another connects with peers.
+The daemon is threaded, i.e., can use multiple cores: one thread interrogates
+the database, another connects with peers.
 
 ## RPC: basic server/client communication
 
-* A daemon listens on a socket and accepts connections from potentially
-  multiple clients.
+A daemon listens on a socket and accepts connections from potentially multiple
+clients.
 
-* RPC connections between clients and server can be optionally securely
-  authenticated and encrypted using elliptic-curve cryptography.
+RPC connections between clients and server can be optionally securely
+authenticated and encrypted using elliptic-curve cryptography.
 
-* Clients can connect to the server and query to (1) issue basic searches
-  with the full features of xapian, e.g., multiple languages, synonyms,
-  ranking, etc., (2) post an ad (or multiple ads in a single command)
-  recorded by the daemon to the database (testing this routinely with 500
-  randomly-generated ads for now), (3) list hashes of ads (used to identify
-  an ad and ensuring uniqueness among peers), and (4) query peers a daemon is
-  connected to at the moment.
+Clients can connect to the server and query to (1) issue basic searches with
+the full features of xapian, e.g., multiple languages, synonyms, ranking, etc.,
+(2) post an ad (or multiple ads in a single command) recorded by the daemon to
+the database (testing this routinely with 500 randomly-generated ads for now),
+(3) list hashes of ads (used to identify an ad and ensuring uniqueness among
+peers), and (4) query peers a daemon is connected to at the moment.
 
 ## P2P: basic peer-to-peer communication
 
-* Each daemon also listens on multiple sockets that connect to other peers,
-  in a 1-to-N fashion, which facilitates peer communication.
+Each daemon also listens on multiple sockets that connect to other peers, in a
+1-to-N fashion, which facilitates peer communication.
 
-* The p2p connections are _not_ currently authenticated or encrypted.
+The p2p connections are _not_ currently authenticated or encrypted.
 
-* Using this mechanism, peers can find each other as they come online, either
-  via a hard-coded default P2P port or an address:port given on the command
-  line of a known peer.
+Using this mechanism, peers can find each other as they come online, either via
+a hard-coded default P2P port or an address:port given on the command line of a
+known peer.
 
-* Peers broadcast their list of peers, which ensures that those peers also
-  find each other that did not know each other at startup, but only know each
-  other via other peers. In other words, eventually all peers find each other.
-  Only tested this with 3-4 peers so far, but the algorithm is general.
+Peers broadcast their list of peers, which ensures that those peers also find
+each other that did not know each other at startup, but only know each other
+via other peers. In other words, eventually all peers find each other.  Only
+tested this with 3-4 peers so far, but the algorithm is general.
 
-* Peers also broadcast their list of hashes, each uniquely identifying an ad
-  in their database. When other peers receive this list, they check what they
-  have and request missing ads they do not yet have. As new peers come online,
-  this procedure eventually ends up with the union of all ads every peer
-  having the same ads in their database.
+Peers also broadcast their list of hashes, each uniquely identifying an ad in
+their database. When other peers receive this list, they check what they have
+and request missing ads they do not yet have. As new peers come online, this
+procedure eventually ends up with the union of all ads every peer having the
+same ads in their database.
 
-* Users use the client to authenticate a user (as a seller or a buyer).
-  Authentication is done via generating a new, or using an existing, monero
-  wallet's mnemonic seed. This seed should be kept secret by each user, as
-  that's not only their single id but also their wallet.
+Users use the client to authenticate a user (as a seller or a buyer).
+Authentication is done via generating a new, or using an existing, monero
+wallet's mnemonic seed. This seed should be kept secret by each user, as that's
+not only their single id but also their wallet.
 
-* After user authentication, users can post ads, currently in the form of json.
+After user authentication, users can post ads, currently in the form of json.
 
-* A hash of the user's wallet's primary key is attached to the ad in the
-  database.
+A hash of the user's wallet's primary key is attached to the ad in the
+database.
 
-* Ads can only be added using a user id (monero wallet primary key).
+Ads can only be added using a user id (monero wallet primary key).
 
-* Only the author of the ad can delete ads from the databsae.
+Only the author of the ad can delete ads from the databsae.
 
-* Changes to the database are automatically synced among peers.
+Changes to the database are automatically synced among peers.
 
 All of the above is regression tested.
 
