@@ -124,15 +124,141 @@ ports can be specified on the command line or not, in which case a sensible
 default is attempted. To find out what command line arguments are accepted, run:
 ```sh
 $ piac-daemon --help
-...
+jbakosi@sprout:~/code/piac/build:master$ ./piac-daemon --help
+piac: piac-daemon v0.1.0-release
+
+Usage: piac-daemon [OPTIONS]
+
+OPTIONS
+  --db <directory>
+         Use database, default: piac.db
+
+  --detach
+         Run as a daemon in the background
+
+  --help
+         Show help message
+
+  --log-file <filename.log>
+         Specify log filename, default: piac-daemon.log
+
+  --log-level <[0-4]>
+         Specify log level: 0: minimum, 4: maximum
+
+  --max-log-file-size <size-in-bytes> 
+         Specify maximum log file size in bytes. Default: 104850000. Once the log file
+         grows past that limit, the next log file is created with a UTC timestamp postfix
+         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent piac-cli from managing
+         the log files.
+
+  --max-log-files <num> 
+         Specify a limit on the number of log files. Default: 50. The oldest log files
+         are removed. In production deployments, you would probably prefer to use
+         established solutions like logrotate instead.
+
+  --peer <hostname>[:port]
+         Specify a peer to connect to
+
+  --rpc-bind-port <port>
+         Listen on RPC port given, default: 55090
+
+  --rpc-secure
+         Enable authentication and secure connection to clients.
+
+  --rpc-public-key-file <filename>
+         Save public key to file. Need to also set --rpc-secure.
+
+  --p2p-bind-port <port>
+         Listen on P2P port given, default: 65090
+
+  --version
+         Show version information
+
 $ piac-cli --help
-...
+piac: piac-cli v0.1.0-release
+
+Usage: piac-cli [OPTIONS]
+
+OPTIONS
+  --help
+         Show help message
+
+  --log-file <filename.log>
+         Specify log filename, default: piac-cli.log
+
+  --log-level <[0-4]>
+         Specify log level: 0: minimum, 4: maximum
+
+  --max-log-file-size <size-in-bytes> 
+         Specify maximum log file size in bytes. Default: 104850000. Once the log file
+         grows past that limit, the next log file is created with a UTC timestamp postfix
+         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent piac-cli from managing
+         the log files.
+
+  --max-log-files <num> 
+         Specify a limit on the number of log files. Default: 50. The oldest log files
+         are removed. In production deployments, you would probably prefer to use
+         established solutions like logrotate instead.
+
+  --rpc-public-key <key>
+         Specify server's public key. This is to facilitate authentication and encrypted
+         communication to server.
+
+  --rpc-public-key-file <filename>
+         Specify filename containing server's public key. --rpc-public-key takes
+         precedence if also specified.
+
+  --version
+         Show version information
 ```
 and issue the 'help' command within the CLI:
 ```sh
 $ piac-cli
 piac-cli> help
-...
+COMMANDS
+      server <host>[:<port>] [<public-key>]
+                Specify server to send commands to. The <host> argument specifies
+                a hostname or an IPv4 address in standard dot notation.
+                The optional <port> argument is an integer specifying a port. The
+                default is localhost:55090. The optional public-key is the server's
+                public key to use for authenticated and secure connections.
+
+      db <command>
+                Send database command to daemon. Example db commands:
+                > db query cat - search for the word 'cat'
+                > db query race -condition - search for 'race' but not 'condition'
+                > db add json <path-to-json-db-entry>
+                > db rm <hash> - remove document
+                > db list - list all documents
+                > db list hash - list all document hashes
+                > db list numdoc - list number of documents
+                > db list numusr - list number of users in db
+
+      exit, quit, q
+                Exit
+
+      help
+                This help message
+
+      keys
+                Show monero wallet keys of current user
+
+      new
+                Create new user identity. This will generate a new monero wallet
+                which will be used as a user id when creating an ad or paying for
+                an item. This wallet can be used just like any other monero wallet.
+                If you want to use your existing monero wallet, see 'user'.
+
+      peers
+                List server peers
+
+      user [<mnemonic>]
+                Show active monero wallet mnemonic seed (user id) if no mnemonic is
+                given. Switch to mnemonic if given.
+
+      version
+                Display piac-cli version
+piac>
 ```
 
 ## Multi-threading
