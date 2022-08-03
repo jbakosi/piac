@@ -45,25 +45,18 @@ and request missing ads they do not yet have. As new peers come online, this
 procedure eventually ends up with the union of all ads every peer having the
 same ads in their database.
 
-Users use the client to authenticate a user (as a seller or a buyer).
-Authentication is done via generating a new, or using an existing, monero
-wallet's mnemonic seed. This seed should be kept secret by each user, as that's
-not only their single id but also their wallet.
-
-After user authentication, users can post ads, currently in the form of json.
-
-A hash of the user's wallet's primary key is attached to the ad in the
-database.
-
-Ads can only be added using a user id (monero wallet primary key).
-
-Only the author of the ad can delete ads from the databsae.
-
-Changes to the database are automatically synced among peers.
+Users authenticate themselves in the client. Authentication is done via
+generating a new, or using an existing, monero wallet's mnemonic seed. There
+are no usernames and passwords, only this seed. This seed should be kept secret
+by each user, as that's not only their single id but also their wallet. If a
+user forgets a seed, there is no way to recover it. After user authentication,
+users can post ads, currently in the form of JSON. A hash of the user's
+wallet's primary key is attached to the ad in the database. Ads can only be
+added using a user id (monero wallet primary key). Only the author of the ad
+can delete ads from the database. Changes to the database are automatically
+synced among peers. The database currently only stores text; images are next.
 
 All of the above is regression tested.
-
-The database currently only stores text; images are next.
 
 # Client/server architecture
 
@@ -125,7 +118,6 @@ default is attempted. To find out what command line arguments are accepted, run:
 
 ```
 $ piac-daemon --help
-jbakosi@sprout:~/code/piac/build:master$ ./piac-daemon --help
 piac: piac-daemon v0.1.0-release
 
 Usage: piac-daemon [OPTIONS]
