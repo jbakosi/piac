@@ -1,4 +1,5 @@
 #include <zmqpp/zmqpp.hpp>
+#include <zmqpp/curve.hpp>
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <getopt.h>
@@ -21,9 +22,20 @@
 
 // *****************************************************************************
 zmqpp::socket
-daemon_socket( zmqpp::context& ctx, const std::string& host ) {
+daemon_socket( zmqpp::context& ctx,
+               const std::string& host,
+               const std::string& server_public_key,
+               const zmqpp::curve::keypair& client_keys )
+{
   MINFO( "Connecting to " << host );
   auto sock = zmqpp::socket( ctx, zmqpp::socket_type::req );
+
+  if (not server_public_key.empty()) {
+    sock.set( zmqpp::socket_option::curve_server_key, server_public_key );
+    sock.set( zmqpp::socket_option::curve_public_key, client_keys.public_key );
+    sock.set( zmqpp::socket_option::curve_secret_key, client_keys.secret_key );
+  }
+
   sock.connect( "tcp://" + host );
   //  configure socket to not wait at close time
   sock.set( zmqpp::socket_option::linger, 0 );
@@ -33,12 +45,14 @@ daemon_socket( zmqpp::context& ctx, const std::string& host ) {
 // *****************************************************************************
 std::string
 pirate_send( const std::string& cmd,
-            zmqpp::context& ctx,
-            const std::string& host )
+             zmqpp::context& ctx,
+             const std::string& host,
+             const std::string& server_public_key,
+             const zmqpp::curve::keypair& client_keys )
 {
   std::string reply;
   int retries = REQUEST_RETRIES;
-  auto server = daemon_socket( ctx, host );
+  auto server = daemon_socket( ctx, host, server_public_key, client_keys );
 
   // send cmd from a Lazy Pirate client
   while (retries) {
@@ -66,7 +80,7 @@ pirate_send( const std::string& cmd,
       } else {
         MWARNING( "No response from " + host + ", retrying: " << retries );
         poller.remove( server );
-        server = daemon_socket( ctx, host );
+        server = daemon_socket( ctx, host, server_public_key, client_keys );
         poller.add( server );
         server.send( request );
       }
@@ -80,7 +94,9 @@ pirate_send( const std::string& cmd,
 // *****************************************************************************
 void send_cmd( std::string cmd,
                zmqpp::context& ctx,
-               const std::string& host
+               const std::string& host,
+               const std::string& server_public_key,
+               const zmqpp::curve::keypair& client_keys
                #ifdef MONERO
              , const std::unique_ptr< monero_wallet_full >& wallet
                #endif
@@ -105,7 +121,7 @@ void send_cmd( std::string cmd,
   #endif
 
   // send message to daemon with command
-  auto reply = pirate_send( cmd, ctx, host );
+  auto reply = pirate_send( cmd, ctx, host, server_public_key, client_keys );
   std::cout << reply << '\n';
 }
 
@@ -195,6 +211,20 @@ void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
 }
 
 // *****************************************************************************
+void
+load_public_key( const std::string& filename, std::string& public_key ) {
+  if (filename.empty() || not public_key.empty()) return;
+  std::ifstream f( filename );
+  if (f.is_open()) {
+    f >> public_key;
+    f.close();
+    MINFO( "Public key read from file " << filename );
+  } else {
+    std::cerr << "Cannot open file for reading: " << filename << '\n';
+  }
+}
+
+// *****************************************************************************
 int main( int argc, char **argv ) {
 
   std::string logfile( piac::cli_executable() + ".log" );
@@ -204,24 +234,31 @@ int main( int argc, char **argv ) {
                        + piac::build_type() );
   std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
   std::size_t max_log_files = MAX_LOG_FILES;
+  std::string server_public_key;
+  std::string server_public_key_file;
 
   // Process command line arguments
   int c;
   int option_index = 0;
-  const int ARG_HELP              = 1000;
-  const int ARG_LOG_FILE          = 1001;
-  const int ARG_LOG_LEVEL         = 1002;
-  const int ARG_MAX_LOG_FILE_SIZE = 1003;
-  const int ARG_MAX_LOG_FILES     = 1004;
-  const int ARG_VERSION           = 1005;
+  const int ARG_HELP                = 1000;
+  const int ARG_LOG_FILE            = 1001;
+  const int ARG_LOG_LEVEL           = 1002;
+  const int ARG_MAX_LOG_FILE_SIZE   = 1003;
+  const int ARG_MAX_LOG_FILES       = 1004;
+  const int ARG_VERSION             = 1005;
+  const int ARG_RPC_SECURE          = 1006;
+  const int ARG_RPC_PUBLIC_KEY      = 1007;
+  const int ARG_RPC_PUBLIC_KEY_FILE = 1008;
   static struct option long_options[] =
-    { // NAME               ARGUMENT           FLAG SHORTNAME/FLAGVALUE
-      {"help",              no_argument,       0,   ARG_HELP             },
-      {"log-file",          required_argument, 0,   ARG_LOG_FILE         },
-      {"log-level",         required_argument, 0,   ARG_LOG_LEVEL        },
-      {"max-log-file-size", required_argument, 0,   ARG_MAX_LOG_FILE_SIZE},
-      {"max-log-files",     required_argument, 0,   ARG_MAX_LOG_FILES    },
-      {"version",           no_argument,       0,   ARG_VERSION          },
+    { // NAME                ARGUMENT           FLAG SHORTNAME/FLAGVALUE
+      {"help",               no_argument,       0, ARG_HELP               },
+      {"log-file",           required_argument, 0, ARG_LOG_FILE           },
+      {"log-level",          required_argument, 0, ARG_LOG_LEVEL          },
+      {"max-log-file-size",  required_argument, 0, ARG_MAX_LOG_FILE_SIZE  },
+      {"max-log-files",      required_argument, 0, ARG_MAX_LOG_FILES      },
+      {"rpc-public-key",     required_argument, 0, ARG_RPC_PUBLIC_KEY     },
+      {"rpc-public-key-file",required_argument, 0, ARG_RPC_PUBLIC_KEY_FILE},
+      {"version",            no_argument,       0, ARG_VERSION            },
       {0, 0, 0, 0}
     };
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
@@ -250,6 +287,14 @@ int main( int argc, char **argv ) {
           "         are removed. In production deployments, you would "
                    "probably prefer to use\n"
           "         established solutions like logrotate instead.\n\n"
+          "  --rpc-public-key <key>\n"
+          "         Specify server's public key. This is to facilitate "
+                   "authentication and encrypted\n"
+          "         communication to server.\n\n"
+          "  --rpc-public-key-file <filename>\n"
+          "         Specify filename containing server's public key. "
+                   "--rpc-public-key takes\n"
+          "         precedence if also specified.\n\n"
           "  --version\n"
           "         Show version information\n\n";
         return EXIT_SUCCESS;
@@ -285,10 +330,20 @@ int main( int argc, char **argv ) {
         break;
       }
 
+      case ARG_RPC_PUBLIC_KEY: {
+        server_public_key = optarg;
+        break;
+      }
+
+      case ARG_RPC_PUBLIC_KEY_FILE: {
+        server_public_key_file = optarg;
+        break;
+      }
+
       case ARG_VERSION: {
         std::cout << version << '\n';
         return EXIT_SUCCESS;
-     }
+      }
 
       default: {
         std::cout << "See --help.\n";
@@ -319,7 +374,7 @@ int main( int argc, char **argv ) {
 
   std::string host = "localhost:55090";
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << "Will send commands to daemon at " << host << '\n';
+  std::cout << "Will send commands to daemon at " << host << ".\n";
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   #ifdef MONERO
@@ -328,6 +383,23 @@ int main( int argc, char **argv ) {
   #endif
 
   MLOG_SET_THREAD_NAME( "cli" );
+
+  zmqpp::curve::keypair client_keys = zmqpp::curve::generate_keypair();
+
+  load_public_key( server_public_key_file, server_public_key );
+
+  if (not server_public_key.empty()) {
+    client_keys = zmqpp::curve::generate_keypair();
+    epee::set_console_color( epee::console_color_green, /* bright = */ false );
+    std::cout << "Connection to server is secure.\n";
+    epee::set_console_color( epee::console_color_default, /* bright = */false );
+    MINFO( "Connection to server is secure" );
+  } else {
+    epee::set_console_color( epee::console_color_red, /* bright = */ false );
+    std::cout << "WARNING: Connection to server is not secure.\n";
+    epee::set_console_color( epee::console_color_default, /* bright = */false );
+    MWARNING( "Connection to server is not secure" );
+  }
 
   // initialize (thread-safe) zmq context
   zmqpp::context ctx;
@@ -343,20 +415,27 @@ int main( int argc, char **argv ) {
     {
 
       std::string b( buf );
-      b.erase( 0, 7 );
-      if (not b.empty()) host = b;
-      epee::set_console_color( epee::console_color_yellow,
-                               /* bright = */ false );
-      std::cout << "Will send commands to daemon at " << host << '\n';
-      epee::set_console_color( epee::console_color_default,
-                               /* bright = */ false );
+      auto t = piac::tokenize( b );
+      if (t.size() > 1) {
+        host = t[1];
+        epee::set_console_color( epee::console_color_yellow,
+                                 /* bright = */ false );
+        std::cout << "Will send commands to daemon at " << host;
+        if (t.size() > 2) {
+          std::cout << ", using public key: " << t[2];
+          server_public_key = t[2];
+        }
+        std::cout << '\n';
+        epee::set_console_color( epee::console_color_default,
+                                 /*bright= */false );
+      }
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
       #ifdef MONERO
-      send_cmd( buf, ctx, host, wallet );
+      send_cmd( buf, ctx, host, server_public_key, client_keys, wallet );
       #else
-      send_cmd( buf, ctx, host );
+      send_cmd( buf, ctx, host, server_public_key, client_keys );
       #endif
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
@@ -368,15 +447,17 @@ int main( int argc, char **argv ) {
 
       std::cout << "COMMANDS\n"
 
-        "      server <host>[:<port>]\n"
+        "      server <host>[:<port>] [<public-key>]\n"
         "                Specify server to send commands to. The <host> "
                         "argument specifies\n"
         "                a hostname or an IPv4 address in standard dot "
-                         "notation. See\n"
-        "                'man gethostbyname'. The optional <port> argument is "
-                        "an\n"
-        "                integer specifying a port. The default is " + host +
-                        ".\n\n"
+                         "notation.\n"
+        "                The optional <port> argument is an integer "
+                        "specifying a port. The\n"
+        "                default is " + host + ". The optional public-key is "
+                        "the server's\n"
+        "                public key to use for authenticated and secure "
+                        "connections.\n\n"
         "      db <command>\n"
         "                Send database command to daemon. Example db commands:\n"
         "                > db query cat - search for the word 'cat'\n"
@@ -427,9 +508,9 @@ int main( int argc, char **argv ) {
     } else if (!strcmp(buf,"peers")) {
 
       #ifdef MONERO
-      send_cmd( "peers", ctx, host, wallet );
+      send_cmd( "peers", ctx, host, server_public_key, client_keys, wallet );
       #else
-      send_cmd( "peers", ctx, host );
+      send_cmd( "peers", ctx, host, server_public_key, client_keys );
       #endif
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {

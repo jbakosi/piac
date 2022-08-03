@@ -17,7 +17,6 @@ set_tests_properties(daemon_arg_bad PROPERTIES
                      LABELS "p2p")
 
 # start 3 daemons in background, run cli tests, kill daemons
-# https://discourse.cmake.org/t/ctest-able-to-daemonize-fixtures/1012
 add_test(NAME daemon_p2p_detach COMMAND ${DAEMON_EXECUTABLE}
          --detach --rpc-bind-port 36091 --p2p-bind-port 35091)
 set_tests_properties(daemon_p2p_detach PROPERTIES

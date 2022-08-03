@@ -13,7 +13,7 @@ piac::trim( std::string& s ) {
 }
 
 // ****************************************************************************
-std::unordered_set< std::string >
+std::vector< std::string >
 piac::tokenize( std::string& s ) {
   using std::regex;
   using std::string;
@@ -21,7 +21,7 @@ piac::tokenize( std::string& s ) {
   regex re( "[ \n\r\t\f\v]" );
   sregex_token_iterator it( begin(s), end(s), re, -1 );
   sregex_token_iterator reg_end;
-  std::unordered_set< std::string > tokens;
-  for (; it != reg_end; ++it) tokens.insert( it->str() );
+  std::vector< std::string > tokens;
+  for (; it != reg_end; ++it) tokens.push_back( it->str() );
   return tokens;
 }

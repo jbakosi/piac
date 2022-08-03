@@ -148,7 +148,6 @@ target_link_libraries(pirate_server
   PRIVATE logging_util ${ZMQPP_LIBRARIES} ${EASYLOGGINGPP_LIBRARIES})
 
 # start a pirate server daemon in background, run cli tests, kill daemon
-# https://discourse.cmake.org/t/ctest-able-to-daemonize-fixtures/1012
 add_test(NAME pirate_server_zmq_detach COMMAND pirate_server --detach)
 set_tests_properties(pirate_server_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
@@ -188,3 +187,40 @@ set_tests_properties(cli_pirate_zmq pirate_server_zmq_grep pirate_cli_zmq_grep
                      PROPERTIES FIXTURES_REQUIRED pirate_server_zmq)
 set_property(TEST kill_pirate_server_zmq pirate_zmq_clean_log
              PROPERTY FIXTURES_CLEANUP pirate_server_zmq)
+
+
+# start secure daemon in background, run cli tests, kill daemon
+add_test(NAME daemon_zmq_rpc_secure_detach COMMAND ${DAEMON_EXECUTABLE}
+         --detach --rpc-bind-port 55191 --p2p-bind-port 65191
+         --rpc-secure --log-file rpc-secure-daemon.log
+         --rpc-public-key-file rpc-secure-daemon.pubkey)
+set_tests_properties(daemon_zmq_rpc_secure_detach PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Forked PID"
+                     LABELS "zmq;secure")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55191" _in)
+add_test(NAME cli_zmq_rpc_secure COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> --rpc-public-key-file rpc-secure-daemon.pubkey --log-file cli.secure.peers < ${_in}")
+set_tests_properties(cli_zmq_rpc_secure PROPERTIES
+  PASS_REGULAR_EXPRESSION "No peers"
+  LABELS "zmq;secure")
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55191" _in)
+add_test(NAME cli_zmq_rpc_secure_nokey COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> --log-file cli.secure.nokey < ${_in}")
+set_tests_properties(cli_zmq_rpc_secure_nokey PROPERTIES
+  PASS_REGULAR_EXPRESSION "No response"
+  FAIL_REGULAR_EXPRESSION "No peers"
+  LABELS "zmq;secure")
+
+add_test(NAME kill_daemon_zmq_rpc_secure
+         COMMAND kill_daemon rpc-secure-daemon.log)
+set_tests_properties(kill_daemon_zmq_rpc_secure PROPERTIES
+                     PASS_REGULAR_EXPRESSION "Killing PID"
+                     FAIL_REGULAR_EXPRESSION "Cannot open file"
+                     LABELS "zmq;secure")
+
+set_property(TEST daemon_zmq_rpc_secure_detach
+             PROPERTY FIXTURES_SETUP rpc_secure_server_zmq)
+set_tests_properties(cli_zmq_rpc_secure cli_zmq_rpc_secure_nokey
+                     PROPERTIES FIXTURES_REQUIRED rpc_secure_server_zmq)
+set_property(TEST kill_daemon_zmq_rpc_secure
+             PROPERTY FIXTURES_CLEANUP rpc_secure_server_zmq)

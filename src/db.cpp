@@ -376,7 +376,9 @@ piac::db_rm( const std::string& author,
   MDEBUG( "db rm " + cmd );
   assert( not author.empty() );
   if (not cmd.empty()) {
-    return db_rm_docs( author, db_name, tokenize(cmd), my_hashes );
+    auto h = tokenize( cmd );
+    std::unordered_set< std::string > hashes_to_delete( begin(h), end(h) );
+    return db_rm_docs( author, db_name, hashes_to_delete, my_hashes );
   }
   return "unknown cmd";
 }

@@ -5,6 +5,7 @@
 #include <condition_variable>
 
 #include <zmqpp/zmqpp.hpp>
+#include <zmqpp/curve.hpp>
 #include <getopt.h>
 #include <unistd.h>
 
@@ -215,12 +216,14 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
 
 // *****************************************************************************
 void
-db_thread( zmqpp::context& ctx,
+db_thread( zmqpp::context& ctx_db,
            const std::string& db_name,
            int rpc_port,
            bool use_strict_ports,
            const std::unordered_map< std::string, zmqpp::socket >& my_peers,
-           std::unordered_set< std::string >& my_hashes )
+           std::unordered_set< std::string >& my_hashes,
+           int rpc_secure,
+           const zmqpp::curve::keypair& server_keys )
 {
   MLOG_SET_THREAD_NAME( "db" );
   MINFO( "db thread initialized" );
@@ -233,16 +236,39 @@ db_thread( zmqpp::context& ctx,
   // initially query hashes of db entries
   db_update_hashes( db_name, my_hashes );
 
+  zmqpp::context ctx_rpc;
+
   // create socket that will listen to clients and bind to server port
-  zmqpp::socket client( ctx, zmqpp::socket_type::reply );
-  try_bind( client, rpc_port, 10, use_strict_ports );
+  auto client_socket = [&](){
+    if (rpc_secure) {
+      zmqpp::auth authenticator( ctx_rpc );
+      authenticator.set_verbose( true );
+      authenticator.configure_domain( "*" );
+      authenticator.allow( "127.0.0.1" );
+      authenticator.configure_curve( "CURVE_ALLOW_ANY" );  // stonehouse
+      zmqpp::socket client( ctx_rpc, zmqpp::socket_type::reply );
+      client.set( zmqpp::socket_option::identity, "IDENT" );
+      int as_server = 1;
+      client.set( zmqpp::socket_option::curve_server, as_server );
+      client.set( zmqpp::socket_option::curve_secret_key,
+                  server_keys.secret_key );
+      try_bind( client, rpc_port, 10, use_strict_ports );
+      return client;
+    } else {
+      zmqpp::socket client( ctx_rpc, zmqpp::socket_type::reply );
+      try_bind( client, rpc_port, 10, use_strict_ports );
+      return client;
+    }
+  };
+  auto client = client_socket();
+
   MINFO( "Bound to RPC port " << rpc_port );
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
   std::cout << "Bound to RPC port " << rpc_port << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   // create socket that will listen to requests for db lookups from peers
-  zmqpp::socket db_p2p( ctx, zmqpp::socket_type::pair );
+  zmqpp::socket db_p2p( ctx_db, zmqpp::socket_type::pair );
   db_p2p.bind( "inproc://db_p2p" );
   MDEBUG( "Bound to inproc:://db_p2p" );
 
@@ -268,8 +294,8 @@ db_thread( zmqpp::context& ctx,
 
 // *****************************************************************************
 zmqpp::socket
-connect( zmqpp::context& ctx, const std::string& addr, int p2p_port ) {
-  // create socket to connect to peers at their rpc port
+connect_peer( zmqpp::context& ctx, const std::string& addr ) {
+  // create socket to connect to peers
   zmqpp::socket dealer( ctx, zmqpp::socket_type::dealer );
   dealer.connect( "tcp://" + addr );
   MDEBUG( "Connecting to peer at " + addr );
@@ -350,9 +376,9 @@ p2p_send_db_requests(
 
 // *****************************************************************************
 void
-p2p_answer_rpc( zmqpp::context& ctx,
-                zmqpp::message& msg,
+p2p_answer_p2p( zmqpp::context& ctx_p2p,
                 zmqpp::socket& db_p2p,
+                zmqpp::message& msg,
                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
                 const std::unordered_set< std::string >& my_hashes,
                 std::unordered_map< std::string,
@@ -377,7 +403,7 @@ p2p_answer_rpc( zmqpp::context& ctx,
       if (addr != "localhost:" + std::to_string(p2p_port) &&
           my_peers.find(addr) == end(my_peers))
       {
-        my_peers.emplace( addr, connect( ctx, addr, p2p_port ) );
+        my_peers.emplace( addr, connect_peer( ctx_p2p, addr ) );
         to_bcast_peers = true;
         to_bcast_hashes = true;
       }
@@ -492,7 +518,8 @@ p2p_answer_ipc( zmqpp::message& msg,
 }
 
 // *****************************************************************************
-void p2p_thread( zmqpp::context& ctx,
+void p2p_thread( zmqpp::context& ctx_p2p,
+                 zmqpp::context& ctx_db,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
                  const std::unordered_set< std::string >& my_hashes,
                  int default_p2p_port,
@@ -502,8 +529,8 @@ void p2p_thread( zmqpp::context& ctx,
   MLOG_SET_THREAD_NAME( "rpc" );
   MINFO( "rpc thread initialized" );
 
-  // create socket that will listen to peers and bind to rpc port
-  zmqpp::socket router( ctx, zmqpp::socket_type::router );
+  // create socket that will listen to peers and bind to p2p port
+  zmqpp::socket router( ctx_p2p, zmqpp::socket_type::router );
   try_bind( router, p2p_port, 10, use_strict_ports );
   MINFO( "Bound to P2P port " << p2p_port );
 
@@ -512,9 +539,9 @@ void p2p_thread( zmqpp::context& ctx,
   // add default peers
   for (int p = default_p2p_port; p < p2p_port; ++p)
     my_peers.emplace( "localhost:" + std::to_string( p ),
-                      zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
+                      zmqpp::socket( ctx_p2p, zmqpp::socket_type::dealer ) );
   // initially connect to peers
-  for (auto& [addr,sock] : my_peers) sock = connect( ctx, addr, p2p_port );
+  for (auto& [addr,sock] : my_peers) sock = connect_peer( ctx_p2p, addr );
   MDEBUG( "Initial number of peers: " << my_peers.size() );
 
   { // log initial number of hashes (populated by db thread)
@@ -524,7 +551,7 @@ void p2p_thread( zmqpp::context& ctx,
   MDEBUG( "Initial number of db hashes: " << my_hashes.size() );
 
   // create socket to send requests for db lookups from peers
-  zmqpp::socket db_p2p( ctx, zmqpp::socket_type::pair );
+  zmqpp::socket db_p2p( ctx_db, zmqpp::socket_type::pair );
   db_p2p.connect( "inproc://db_p2p" );
   MDEBUG( "Connected to inproc:://db_p2p" );
 
@@ -549,7 +576,7 @@ void p2p_thread( zmqpp::context& ctx,
       if (poller.has_input( router )) {
         zmqpp::message msg;
         router.receive( msg );
-        p2p_answer_rpc( ctx, msg, db_p2p, my_peers, my_hashes, db_requests,
+        p2p_answer_p2p( ctx_p2p, db_p2p, msg, my_peers, my_hashes, db_requests,
                         p2p_port, to_bcast_peers, to_bcast_hashes,
                         to_send_db_requests );
       }
@@ -559,6 +586,20 @@ void p2p_thread( zmqpp::context& ctx,
         p2p_answer_ipc( msg, my_peers, to_bcast_hashes );
       }
     }
+  }
+}
+
+// *****************************************************************************
+void
+save_public_key( const std::string& filename, const std::string& public_key ) {
+  if (filename.empty()) return;
+  std::ofstream f( filename );
+  if (f.is_open()) {
+    f << public_key;
+    f.close();
+    MINFO( "Public key saved to file: " << filename );
+  } else {
+    std::cerr << "Cannot open file for writing: " << filename << '\n';
   }
 }
 
@@ -573,7 +614,6 @@ int main( int argc, char **argv ) {
       detach = 1;
 
   if (detach) {
-
     // Fork the current process. The parent process continues with a process ID
     // greater than 0.  A process ID lower than 0 indicates a failure in either
     // process.
@@ -601,7 +641,6 @@ int main( int argc, char **argv ) {
     close( STDIN_FILENO );
     close( STDOUT_FILENO );
     close( STDERR_FILENO );
-
   }
 
   // Defaults
@@ -616,36 +655,41 @@ int main( int argc, char **argv ) {
   std::size_t max_log_files = MAX_LOG_FILES;
   std::string version( "piac: " + piac::daemon_executable() + " v"
                        + piac::project_version() + "-" + piac::build_type() );
+  std::string rpc_public_key_file;
 
   std::vector< std::string > peers;
 
   // Process command line arguments
   int c;
   int option_index = 0;
-  const int ARG_DB                =  999;
-  const int ARG_HELP              = 1000;
-  const int ARG_LOG_FILE          = 1002;
-  const int ARG_LOG_LEVEL         = 1003;
-  const int ARG_MAX_LOG_FILE_SIZE = 1004;
-  const int ARG_MAX_LOG_FILES     = 1005;
-  const int ARG_PEER              = 1006;
-  const int ARG_RPC_PORT          = 1007;
-  const int ARG_P2P_PORT          = 1008;
-  const int ARG_VERSION           = 1009;
+  int rpc_secure = 0;
+  const int ARG_DB                  = 1000;
+  const int ARG_HELP                = 1001;
+  const int ARG_LOG_FILE            = 1002;
+  const int ARG_LOG_LEVEL           = 1003;
+  const int ARG_MAX_LOG_FILE_SIZE   = 1004;
+  const int ARG_MAX_LOG_FILES       = 1005;
+  const int ARG_PEER                = 1006;
+  const int ARG_RPC_PORT            = 1007;
+  const int ARG_RPC_PUBLIC_KEY_FILE = 1008;
+  const int ARG_P2P_PORT            = 1009;
+  const int ARG_VERSION             = 1010;
   static struct option long_options[] =
     { // NAME               ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
-      {"db",                required_argument, 0,       ARG_DB               },
-      {"detach",            no_argument,       &detach, 1                    },
-      {"help",              no_argument,       0,       ARG_HELP             },
-      {"log-file",          required_argument, 0,       ARG_LOG_FILE         },
-      {"log-level",         required_argument, 0,       ARG_LOG_LEVEL        },
-      {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE},
-      {"max-log-files",     required_argument, 0,       ARG_MAX_LOG_FILES    },
-      {"peer",              required_argument, 0,       ARG_PEER             },
-      {"rpc-bind-port",     required_argument, 0,       ARG_RPC_PORT         },
-      {"p2p-bind-port",     required_argument, 0,       ARG_P2P_PORT         },
-      {"version",           no_argument,       0,       ARG_VERSION          },
-      {0, 0, 0, 0}
+    {"db",                required_argument, 0,       ARG_DB                 },
+    {"detach",            no_argument,       &detach, 1                      },
+    {"help",              no_argument,       0,       ARG_HELP               },
+    {"log-file",          required_argument, 0,       ARG_LOG_FILE           },
+    {"log-level",         required_argument, 0,       ARG_LOG_LEVEL          },
+    {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE  },
+    {"max-log-files",     required_argument, 0,       ARG_MAX_LOG_FILES      },
+    {"peer",              required_argument, 0,       ARG_PEER               },
+    {"rpc-bind-port",     required_argument, 0,       ARG_RPC_PORT           },
+    {"rpc-secure",        no_argument,       &rpc_secure, 1                  },
+    {"rpc-public-key-file",required_argument,0,ARG_RPC_PUBLIC_KEY_FILE},
+    {"p2p-bind-port",     required_argument, 0,       ARG_P2P_PORT           },
+    {"version",           no_argument,       0,       ARG_VERSION            },
+    {0, 0, 0, 0}
     };
 
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
@@ -689,6 +733,10 @@ int main( int argc, char **argv ) {
           "  --rpc-bind-port <port>\n"
           "         Listen on RPC port given, default: "
                   + std::to_string( rpc_port ) + "\n\n"
+          "  --rpc-secure\n"
+          "         Enable authentication and secure connection to clients.\n\n"
+          "  --rpc-public-key-file <filename>\n"
+          "         Save public key to file. Need to also set --rpc-secure.\n\n"
           "  --p2p-bind-port <port>\n"
           "         Listen on P2P port given, default: "
                   + std::to_string( p2p_port ) + "\n\n"
@@ -705,6 +753,11 @@ int main( int argc, char **argv ) {
       case ARG_RPC_PORT: {
         rpc_port = atoi( optarg );
         use_strict_ports = true;
+        break;
+      }
+
+      case ARG_RPC_PUBLIC_KEY_FILE: {
+        rpc_public_key_file = optarg;
         break;
       }
 
@@ -760,6 +813,11 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
+  if (not rpc_public_key_file.empty() && not rpc_secure) {
+    std::cerr << "Need --rpc-secure to secure RPC channel.\n";
+    return EXIT_FAILURE;
+  }
+
   epee::set_console_color( epee::console_color_green, /* bright = */ false );
   std::cout << version << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
@@ -773,19 +831,37 @@ int main( int argc, char **argv ) {
   piac::setup_logging( logfile, log_level, /* console_logging = */ false,
                        max_log_file_size, max_log_files );
 
-  if (detach) {
-    auto pid = getpid();
-    std::cout << "Forked PID: " << pid << '\n';
-    MINFO( "Forked PID: " << pid );
+  zmqpp::curve::keypair server_keys;
+  if (rpc_secure) {
+    server_keys = zmqpp::curve::generate_keypair();
+    epee::set_console_color( epee::console_color_green, /* bright = */ false );
+    std::cout << "Connections to this server are secure.\n";
+    epee::set_console_color( epee::console_color_white, /* bright = */false );
+    std::cout << "Public key: " << server_keys.public_key << '\n';
+    epee::set_console_color( epee::console_color_default, /* bright = */false );
+    MINFO( "Connections to this server are secure" );
+    MINFO( "Public key: " << server_keys.public_key  );
+    save_public_key( rpc_public_key_file, server_keys.public_key );
+  } else {
+    epee::set_console_color( epee::console_color_red, /* bright = */ false );
+    std::cout << "WARNING: Connections to this server are not secure.\n";
+    epee::set_console_color( epee::console_color_default, /* bright = */false );
+    MWARNING( "Connections to this server are not secure" );
   }
 
-  // initialize (thread-safe) zmq context
-  zmqpp::context ctx;
+  if (detach) {
+    MINFO( "Forked PID: " << getpid() );
+    if (rpc_secure) MINFO( "Public key: " << server_keys.public_key  );
+  }
+
+  // initialize (thread-safe) zmq contexts
+  zmqpp::context ctx_p2p;       // for p2p comm
+  zmqpp::context ctx_db;        // for inproc comm
 
   // add initial peers
   std::unordered_map< std::string, zmqpp::socket > my_peers;
   for (const auto& p : peers)
-    my_peers.emplace( p, zmqpp::socket( ctx, zmqpp::socket_type::dealer ) );
+    my_peers.emplace( p, zmqpp::socket( ctx_p2p, zmqpp::socket_type::dealer ) );
 
   // will store db entry hashes
   std::unordered_set< std::string > my_hashes;
@@ -794,12 +870,12 @@ int main( int argc, char **argv ) {
   std::vector< std::thread > threads;
 
   threads.emplace_back( p2p_thread,
-    std::ref(ctx), std::ref(my_peers), std::ref(my_hashes), default_p2p_port,
-    p2p_port, use_strict_ports );
+    std::ref(ctx_p2p), std::ref(ctx_db), std::ref(my_peers),
+    std::ref(my_hashes), default_p2p_port, p2p_port, use_strict_ports );
 
   threads.emplace_back( db_thread,
-    std::ref(ctx), db_name, rpc_port, use_strict_ports, std::ref(my_peers),
-    std::ref(my_hashes) );
+    std::ref(ctx_db), db_name, rpc_port, use_strict_ports, std::ref(my_peers),
+    std::ref(my_hashes), rpc_secure, std::ref(server_keys) );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();
