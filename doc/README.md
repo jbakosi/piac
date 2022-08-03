@@ -123,7 +123,7 @@ Multiple daemons and clients can run on a single computer and the communication
 ports can be specified on the command line or not, in which case a sensible
 default is attempted. To find out what command line arguments are accepted, run:
 
-```sh
+```
 $ piac-daemon --help
 jbakosi@sprout:~/code/piac/build:master$ ./piac-daemon --help
 piac: piac-daemon v0.1.0-release
@@ -176,7 +176,7 @@ OPTIONS
          Show version information
 ```
 
-```sh
+```
 $ piac-cli --help
 piac: piac-cli v0.1.0-release
 
@@ -217,7 +217,7 @@ OPTIONS
 
 and issue the 'help' command within the CLI:
 
-```sh
+```
 $ piac-cli
 piac-cli> help
 COMMANDS
