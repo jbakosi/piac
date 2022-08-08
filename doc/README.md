@@ -1,3 +1,13 @@
+# Table of contents
+
+  - [Overall status](#status)
+    - [RPC: server/client communication](#rpc)
+    - [P2P: peer-to-peer communication](#p2p)
+  - [Client/server architecture](#architecture)
+    - [Communication](#communication)
+    - [Multi-threading](#multi-threading)
+    - [Encrypted RPC](#encrypted-rpc)
+
 # Overall status
 
 Basic p2p communication among multiple daemons works and routinely tested. Some
@@ -8,13 +18,14 @@ Networking and threading code is fully asynchronous.
 The daemon is threaded, i.e., can use multiple cores: one thread interrogates
 the database, another connects with peers.
 
-## RPC: basic server/client communication
+## RPC: server/client communication
 
 A daemon listens on a socket and accepts connections from potentially multiple
 clients.
 
 RPC connections between clients and server can be optionally securely
-authenticated and encrypted using elliptic-curve cryptography.
+authenticated and encrypted using elliptic-curve cryptography. See below for
+how to set that up.
 
 Clients can connect to the server and query to (1) issue basic searches with
 the full features of xapian, e.g., multiple languages, synonyms, ranking, etc.,
@@ -23,7 +34,7 @@ the database (testing this routinely with 500 randomly-generated ads for now),
 (3) list hashes of ads (used to identify an ad and ensuring uniqueness among
 peers), and (4) query peers a daemon is connected to at the moment.
 
-## P2P: basic peer-to-peer communication
+## P2P: peer-to-peer communication
 
 Each daemon also listens on multiple sockets that connect to other peers, in a
 1-to-N fashion, which facilitates peer communication.
@@ -114,149 +125,7 @@ There are two main channels of communication:
 
 Multiple daemons and clients can run on a single computer and the communication
 ports can be specified on the command line or not, in which case a sensible
-default is attempted. To find out what command line arguments are accepted, run:
-
-```
-$ piac-daemon --help
-piac: piac-daemon v0.1.0-release
-
-Usage: piac-daemon [OPTIONS]
-
-OPTIONS
-  --db <directory>
-         Use database, default: piac.db
-
-  --detach
-         Run as a daemon in the background
-
-  --help
-         Show help message
-
-  --log-file <filename.log>
-         Specify log filename, default: piac-daemon.log
-
-  --log-level <[0-4]>
-         Specify log level: 0: minimum, 4: maximum
-
-  --max-log-file-size <size-in-bytes> 
-         Specify maximum log file size in bytes. Default: 104850000. Once the log file
-         grows past that limit, the next log file is created with a UTC timestamp postfix
-         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent piac-cli from managing
-         the log files.
-
-  --max-log-files <num> 
-         Specify a limit on the number of log files. Default: 50. The oldest log files
-         are removed. In production deployments, you would probably prefer to use
-         established solutions like logrotate instead.
-
-  --peer <hostname>[:port]
-         Specify a peer to connect to
-
-  --rpc-bind-port <port>
-         Listen on RPC port given, default: 55090
-
-  --rpc-secure
-         Enable authentication and secure connection to clients.
-
-  --rpc-public-key-file <filename>
-         Save public key to file. Need to also set --rpc-secure.
-
-  --p2p-bind-port <port>
-         Listen on P2P port given, default: 65090
-
-  --version
-         Show version information
-```
-
-```
-$ piac-cli --help
-piac: piac-cli v0.1.0-release
-
-Usage: piac-cli [OPTIONS]
-
-OPTIONS
-  --help
-         Show help message
-
-  --log-file <filename.log>
-         Specify log filename, default: piac-cli.log
-
-  --log-level <[0-4]>
-         Specify log level: 0: minimum, 4: maximum
-
-  --max-log-file-size <size-in-bytes> 
-         Specify maximum log file size in bytes. Default: 104850000. Once the log file
-         grows past that limit, the next log file is created with a UTC timestamp postfix
-         -YYYY-MM-DD-HH-MM-SS. Set --max-log-file-size 0 to prevent piac-cli from managing
-         the log files.
-
-  --max-log-files <num> 
-         Specify a limit on the number of log files. Default: 50. The oldest log files
-         are removed. In production deployments, you would probably prefer to use
-         established solutions like logrotate instead.
-
-  --rpc-public-key <key>
-         Specify server's public key. This is to facilitate authentication and encrypted
-         communication to server.
-
-  --rpc-public-key-file <filename>
-         Specify filename containing server's public key. --rpc-public-key takes
-         precedence if also specified.
-
-  --version
-         Show version information
-```
-
-and issue the 'help' command within the CLI:
-
-```
-$ piac-cli
-piac-cli> help
-COMMANDS
-      server <host>[:<port>] [<public-key>]
-                Specify server to send commands to. The <host> argument specifies
-                a hostname or an IPv4 address in standard dot notation.
-                The optional <port> argument is an integer specifying a port. The
-                default is localhost:55090. The optional public-key is the server's
-                public key to use for authenticated and secure connections.
-
-      db <command>
-                Send database command to daemon. Example db commands:
-                > db query cat - search for the word 'cat'
-                > db query race -condition - search for 'race' but not 'condition'
-                > db add json <path-to-json-db-entry>
-                > db rm <hash> - remove document
-                > db list - list all documents
-                > db list hash - list all document hashes
-                > db list numdoc - list number of documents
-                > db list numusr - list number of users in db
-
-      exit, quit, q
-                Exit
-
-      help
-                This help message
-
-      keys
-                Show monero wallet keys of current user
-
-      new
-                Create new user identity. This will generate a new monero wallet
-                which will be used as a user id when creating an ad or paying for
-                an item. This wallet can be used just like any other monero wallet.
-                If you want to use your existing monero wallet, see 'user'.
-
-      peers
-                List server peers
-
-      user [<mnemonic>]
-                Show active monero wallet mnemonic seed (user id) if no mnemonic is
-                given. Switch to mnemonic if given.
-
-      version
-                Display piac-cli version
-piac>
-```
+default is attempted.
 
 ## Multi-threading
 
@@ -289,3 +158,102 @@ zmq's [inproc](http://api.zeromq.org/master:zmq-inproc) transport using the
    |    /      |                              |    /      |
    |    \      |                              |    \      |
 ```
+
+## Encrypted RPC
+
+The (RPC) communication channel between client and server can be optionally
+encrypted. Encryption is implemented via [CurveZMQ](http://curvezmq.org), which
+is based on [CurveCP](https://curvecp.org/), using the _Curve25519_ elliptic
+curve. From the channel-security viewpoint, there are three ways to connect a
+client to a server:
+
+1. _grasslands_, which corresponds to no encryption, i.e., clear text,
+2. _stonehouse_, which encrypts the channel but allows any client to connect,
+   and
+3. _ironhouse_, which encrypts the channel and only allows a set of
+   authorized clients to connect.
+
+These names corresponds to those coined by [Pieter
+Hintjens](http://hintjens.com/blog:49) of ZMQ. The grasslands protocol is
+really only useful if the client and server are running on the same physical
+machine, since messages are sent via clear text. Stonehouse or ironhouse should
+be used if the client and server communicate accross the network.
+
+### Runnging client/server in _grasslands_ (no-security) mode
+
+This is the simplest, neither the server nor the client require any extra
+command line arguments:
+```sh
+$ ./piac-daemon
+$ ./piac-cli
+```
+
+You either run the daemon in the background using `--detach`, or run it in its
+own terminal.
+
+### Runnging client/server in _stonehouse_ (encrypted) mode
+
+This sets up an encrypted channel between server and client and the server only
+allows clients that have the server's public key. Only encrypted connections
+are allowed. There are two ways to configure stonehouse:
+
+#### 1. Stonehouse using self-generated keys
+The simplest way to setup stonehouse is to let the server generate its own
+public key, saved into a file, which then the client can read:
+
+```sh
+$ ./piac-daemon --rpc-secure
+$ ./piac-cli --rpc-secure --rpc-server-public-key-file stonehouse.pub
+```
+
+#### 2. Stonehouse using externally-generated keys
+If you want to specify your own public key, you can generate it with the
+`curve_keygen` executable:
+```
+$ ./curve_keygen 
+=== CURVE PUBLIC KEY ===
+Rs:L&e&Y:}q}=UBluws5TB/H[f?(k=Okb6XUE112
+=== CURVE SECRET KEY ===
+gvi&6Bq&xMpm8WjmW!nmi}vELzrS^0:%Zg4gt1z*
+```
+which then you can feed to the server and the client:
+```sh
+$ echo 'Rs:L&e&Y:}q}=UBluws5TB/H[f?(k=Okb6XUE112' > server.pub
+$ echo 'gvi&6Bq&xMpm8WjmW!nmi}vELzrS^0:%Zg4gt1z*' > server
+$ ./piac-daemon --rpc-secure --rpc-server-public-key-file server.pub --rpc-server-secret-key-file server
+$ ./piac-cli --rpc-secure --rpc-server-public-key-file server.pub
+```
+
+### Running client/server in _ironhouse_ (encrypted & authenticated) mode
+
+The is the best from the security viewpoint, the server only allows encrypted
+and authenticated connections from a set predefined clients.
+
+First, generate keypairs for both the server and the client:
+```
+$ ./curve_keygen 
+=== CURVE PUBLIC KEY ===
+5![.0HCW=JSjA>YVGbcerGwRiQBX4t?u$PE}v=p9
+=== CURVE SECRET KEY ===
+lI}y&OTD9)LK15gA&#[Xt=&N=gca}lLJG8j}%*L9
+$ ./curve_keygen
+=== CURVE PUBLIC KEY ===
+cb{B{CJwNf/5K%?[Vbb!FVTYAs:PfX}K?yMh9Fu{
+=== CURVE SECRET KEY ===
+:}@kZX)=5fnSa9tRcZ77NE!Hb)P014}o/<11DiSK
+```
+Then setup the server and the client:
+```sh
+$ echo '5![.0HCW=JSjA>YVGbcerGwRiQBX4t?u$PE}v=p9' > server.pub
+$ echo 'lI}y&OTD9)LK15gA&#[Xt=&N=gca}lLJG8j}%*L9' > server
+$ echo 'cb{B{CJwNf/5K%?[Vbb!FVTYAs:PfX}K?yMh9Fu{' > client.pub
+$ echo ':}@kZX)=5fnSa9tRcZ77NE!Hb)P014}o/<11DiSK' > client
+$ echo 'cb{B{CJwNf/5K%?[Vbb!FVTYAs:PfX}K?yMh9Fu{' > authorized_clients
+$ ./piac-daemon --rpc-secure --rpc-server-public-key-file server.pub --rpc-server-secret-key-file server --rpc-authorized-clients-file authorized_clients
+$ ./piac-cli --rpc-secure --rpc-server-public-key-file server.pub --rpc-client-public-key-file client.pub --rpc-client-secret-key-file client
+```
+Note that the file `authorized_clients` can contain multiple clients' public
+keys, a new on on each line.
+
+__Note:__ Always use an encrypted communication channel to distribute keys,
+e.g., via rsync or scp.
