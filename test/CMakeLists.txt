@@ -18,4 +18,5 @@ add_executable(rnd_json_entry rnd_json_entry.cpp)
 
 add_subdirectory(db)
 add_subdirectory(zmq)
+add_subdirectory(curve-zmq)
 add_subdirectory(p2p)

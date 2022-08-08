@@ -222,3 +222,8 @@ configure_file( "${PIAC_SOURCE_DIR}/project_config.hpp.in"
                 "${PROJECT_BINARY_DIR}/project_config.hpp" )
 configure_file( "${PIAC_SOURCE_DIR}/project_config.cpp.in"
                 "${PROJECT_BINARY_DIR}/project_config.cpp" )
+
+# configure zmq curve certificate generator executable
+add_executable(curve_keygen ${PIAC_SOURCE_DIR}/curve_keygen.cpp)
+target_include_directories(curve_keygen PUBLIC ${ZMQPP_INCLUDE_DIRS})
+target_link_libraries(curve_keygen PRIVATE ${ZMQPP_LIBRARIES})

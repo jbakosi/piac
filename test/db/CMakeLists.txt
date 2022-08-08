@@ -27,7 +27,7 @@ file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.add_docs_json_other" _in)
 add_test(NAME cli_db_add_docs_json_other
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_add_docs_json_other PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Number of users: 2"
+                     PASS_REGULAR_EXPRESSION "Number of users: [2-9]"
                      LABELS "db")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/entry.json" _out)

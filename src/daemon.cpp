@@ -6,6 +6,7 @@
 
 #include <zmqpp/zmqpp.hpp>
 #include <zmqpp/curve.hpp>
+
 #include <getopt.h>
 #include <unistd.h>
 
@@ -223,7 +224,8 @@ db_thread( zmqpp::context& ctx_db,
            const std::unordered_map< std::string, zmqpp::socket >& my_peers,
            std::unordered_set< std::string >& my_hashes,
            int rpc_secure,
-           const zmqpp::curve::keypair& server_keys )
+           const zmqpp::curve::keypair& rpc_server_keys,
+           const std::vector< std::string >& rpc_authorized_clients )
 {
   MLOG_SET_THREAD_NAME( "db" );
   MINFO( "db thread initialized" );
@@ -238,29 +240,30 @@ db_thread( zmqpp::context& ctx_db,
 
   zmqpp::context ctx_rpc;
 
-  // create socket that will listen to clients and bind to server port
-  auto client_socket = [&](){
-    if (rpc_secure) {
-      zmqpp::auth authenticator( ctx_rpc );
-      authenticator.set_verbose( true );
-      authenticator.configure_domain( "*" );
-      authenticator.allow( "127.0.0.1" );
-      authenticator.configure_curve( "CURVE_ALLOW_ANY" );  // stonehouse
-      zmqpp::socket client( ctx_rpc, zmqpp::socket_type::reply );
-      client.set( zmqpp::socket_option::identity, "IDENT" );
-      int as_server = 1;
-      client.set( zmqpp::socket_option::curve_server, as_server );
-      client.set( zmqpp::socket_option::curve_secret_key,
-                  server_keys.secret_key );
-      try_bind( client, rpc_port, 10, use_strict_ports );
-      return client;
-    } else {
-      zmqpp::socket client( ctx_rpc, zmqpp::socket_type::reply );
-      try_bind( client, rpc_port, 10, use_strict_ports );
-      return client;
+  // configure secure socket that will listen to clients and bind to RPC port
+  zmqpp::auth authenticator( ctx_rpc );
+  authenticator.set_verbose( true );
+  authenticator.configure_domain( "*" );
+  authenticator.allow( "127.0.0.1" );
+  if (rpc_secure) {
+    if (rpc_authorized_clients.empty()) {    // stonehouse
+      authenticator.configure_curve( "CURVE_ALLOW_ANY" );
+    } else {                                  // ironhouse
+      for (const auto& cpk : rpc_authorized_clients) {
+        authenticator.configure_curve( cpk );
+      }
     }
-  };
-  auto client = client_socket();
+  }
+  // create socket that will listen to clients via RPC
+  zmqpp::socket client( ctx_rpc, zmqpp::socket_type::reply );
+  if (rpc_secure) {
+    client.set( zmqpp::socket_option::identity, "IDENT" );
+    int as_server = 1;
+    client.set( zmqpp::socket_option::curve_server, as_server );
+    client.set( zmqpp::socket_option::curve_secret_key,
+                rpc_server_keys.secret_key );
+  }
+  try_bind( client, rpc_port, 10, use_strict_ports );
 
   MINFO( "Bound to RPC port " << rpc_port );
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
@@ -604,105 +607,52 @@ save_public_key( const std::string& filename, const std::string& public_key ) {
 }
 
 // *****************************************************************************
-// piac daemon main
-int main( int argc, char **argv ) {
-
-  int detach = 0;
-  std::vector< std::string > args( argv, argv+argc );
-  for (std::size_t i=1; i<args.size(); ++i)
-    if (args[i] == "--detach")
-      detach = 1;
-
-  if (detach) {
-    // Fork the current process. The parent process continues with a process ID
-    // greater than 0.  A process ID lower than 0 indicates a failure in either
-    // process.
-    pid_t pid = fork();
-    if (pid > 0) {
-      std::cout << "Running in daemon mode. Forked PID: " << pid
-                << ". See the log file for details." << std::endl;
-      return EXIT_SUCCESS;
-    } else if (pid < 0) {
-      return EXIT_FAILURE;
-    }
-
-    // Generate a session ID for the child process and ensure it is valid.
-    if (setsid() < 0) {
-      // Log failure and exit
-      std::cerr << "Could not generate session ID for child process\n";
-      // If a new session ID could not be generated, we must terminate the child
-      // process or it will be orphaned.
-      return EXIT_FAILURE;
-    }
-
-    // A daemon cannot use the terminal, so close standard file descriptors for
-    // security reasons and also because ctest hangs in daemon mode waiting for
-    // stdout and stderr to be closed.
-    close( STDIN_FILENO );
-    close( STDOUT_FILENO );
-    close( STDERR_FILENO );
+void load_server_key( const std::string& filename, std::string& key ) {
+  if (filename.empty()) return;
+  std::ifstream f( filename );
+  if (not f.good()) {
+    epee::set_console_color( epee::console_color_red, /*bright=*/ false );
+    std::cerr <<  "Cannot open file for reading: " << filename << '\n';
+    epee::set_console_color( epee::console_color_default, /*bright=*/ false );
+    return;
   }
+  f >> key;
+  assert( key.size() == 40 );
+  f.close();
+  MINFO( "Read key from file " + filename );
+}
 
-  // Defaults
-  int rpc_port = 55090;         // used for client/server communication
-  int default_p2p_port = 65090; // used for peer-to-peer communication
-  int p2p_port = default_p2p_port;
-  bool use_strict_ports = false;
-  std::string db_name( "piac.db" );
-  std::string logfile( piac::daemon_executable() + ".log" );
-  std::string log_level( "4" );
-  std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
-  std::size_t max_log_files = MAX_LOG_FILES;
-  std::string version( "piac: " + piac::daemon_executable() + " v"
-                       + piac::project_version() + "-" + piac::build_type() );
-  std::string rpc_public_key_file;
+// *****************************************************************************
+void load_client_keys( const std::string& filename,
+                       std::vector< std::string >& keys )
+{
+  if (filename.empty()) return;
+  std::ifstream f( filename );
+  if (not f.good()) {
+    epee::set_console_color( epee::console_color_red, /*bright=*/ false );
+    std::cerr <<  "Cannot open file for reading: " << filename << '\n';
+    epee::set_console_color( epee::console_color_default, /*bright=*/ false );
+    exit( EXIT_FAILURE );
+  }
+  while (not f.eof()) {
+    std::string key;
+    f >> key;
+    if (key.size() != 40) continue;
+    keys.emplace_back( std::move(key) );
+  }
+  f.close();
+  MINFO("Read " << keys.size() << " client keys from file " + filename);
+}
 
-  std::vector< std::string > peers;
-
-  // Process command line arguments
-  int c;
-  int option_index = 0;
-  int rpc_secure = 0;
-  const int ARG_DB                  = 1000;
-  const int ARG_HELP                = 1001;
-  const int ARG_LOG_FILE            = 1002;
-  const int ARG_LOG_LEVEL           = 1003;
-  const int ARG_MAX_LOG_FILE_SIZE   = 1004;
-  const int ARG_MAX_LOG_FILES       = 1005;
-  const int ARG_PEER                = 1006;
-  const int ARG_RPC_PORT            = 1007;
-  const int ARG_RPC_PUBLIC_KEY_FILE = 1008;
-  const int ARG_P2P_PORT            = 1009;
-  const int ARG_VERSION             = 1010;
-  static struct option long_options[] =
-    { // NAME               ARGUMENT           FLAG     SHORTNAME/FLAGVALUE
-    {"db",                required_argument, 0,       ARG_DB                 },
-    {"detach",            no_argument,       &detach, 1                      },
-    {"help",              no_argument,       0,       ARG_HELP               },
-    {"log-file",          required_argument, 0,       ARG_LOG_FILE           },
-    {"log-level",         required_argument, 0,       ARG_LOG_LEVEL          },
-    {"max-log-file-size", required_argument, 0,       ARG_MAX_LOG_FILE_SIZE  },
-    {"max-log-files",     required_argument, 0,       ARG_MAX_LOG_FILES      },
-    {"peer",              required_argument, 0,       ARG_PEER               },
-    {"rpc-bind-port",     required_argument, 0,       ARG_RPC_PORT           },
-    {"rpc-secure",        no_argument,       &rpc_secure, 1                  },
-    {"rpc-public-key-file",required_argument,0,ARG_RPC_PUBLIC_KEY_FILE},
-    {"p2p-bind-port",     required_argument, 0,       ARG_P2P_PORT           },
-    {"version",           no_argument,       0,       ARG_VERSION            },
-    {0, 0, 0, 0}
-    };
-
-  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
-    switch (c) {
-
-      case ARG_DB: {
-        db_name = optarg;
-        break;
-      }
-
-      case ARG_HELP: {
-        std::cout << version << "\n\n" <<
-          "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
+// *****************************************************************************
+std::string
+usage( const std::string& db_name,
+       const std::string& logfile,
+       const std::string& rpc_server_save_public_key_file,
+       int rpc_port,
+       int p2p_port )
+{
+  return "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
           "OPTIONS\n"
           "  --db <directory>\n"
           "         Use database, default: " + db_name + "\n\n"
@@ -734,14 +684,113 @@ int main( int argc, char **argv ) {
           "         Listen on RPC port given, default: "
                   + std::to_string( rpc_port ) + "\n\n"
           "  --rpc-secure\n"
-          "         Enable authentication and secure connection to clients.\n\n"
-          "  --rpc-public-key-file <filename>\n"
-          "         Save public key to file. Need to also set --rpc-secure.\n\n"
+          "         Enable secure connection to clients.\n\n"
+          "  --rpc-server-public-key-file <filename>\n"
+          "         Load server public key from file. Need to also set "
+                   "--rpc-secure.\n\n"
+          "  --rpc-server-secret-key-file <filename>\n"
+          "         Load server secret key from file. Need to also set "
+                   "--rpc-secure.\n\n"
+          "  --rpc-authorized-clients-file <filename>\n"
+          "         Only allow client connections with public keys read "
+                   "from this file. Need to also\n"
+          "         set --rpc-secure.\n\n"
+          "  --rpc-server-save-public-key-file <filename>\n"
+          "         Save self-generated server public key to file. Default: "
+                  + rpc_server_save_public_key_file + ". Need to also set "
+                   "--rpc-secure.\n\n"
           "  --p2p-bind-port <port>\n"
           "         Listen on P2P port given, default: "
                   + std::to_string( p2p_port ) + "\n\n"
           "  --version\n"
           "         Show version information\n\n";
+}
+
+// *****************************************************************************
+// piac daemon main
+int main( int argc, char **argv ) {
+
+  // save command line
+  std::vector< std::string > args( argv, argv+argc );
+  std::stringstream cmdline;
+  for (const auto& a : args) cmdline << a << ' ';
+
+  // defaults
+  int rpc_port = 55090;         // for client/server communication
+  int default_p2p_port = 65090; // for peer-to-peer communication
+  int p2p_port = default_p2p_port;
+  bool use_strict_ports = false;
+  std::string db_name( "piac.db" );
+  std::string logfile( piac::daemon_executable() + ".log" );
+  std::string log_level( "4" );
+  std::size_t max_log_file_size = MAX_LOG_FILE_SIZE;
+  std::size_t max_log_files = MAX_LOG_FILES;
+  std::string version( "piac: " + piac::daemon_executable() + " v"
+                       + piac::project_version() + "-" + piac::build_type() );
+  std::vector< std::string > peers;
+  std::string rpc_server_public_key_file;
+  std::string rpc_server_secret_key_file;
+  std::string rpc_authorized_clients_file;
+  std::vector< std::string > rpc_authorized_clients;
+  std::string rpc_server_save_public_key_file = "stonehouse.pub";
+
+  // Process command line arguments
+  int c;
+  int option_index = 0;
+  int detach = 0;
+  int rpc_secure = 0;
+  int num_err = 0;
+  const int ARG_DB                              = 1000;
+  const int ARG_HELP                            = 1001;
+  const int ARG_LOG_FILE                        = 1002;
+  const int ARG_LOG_LEVEL                       = 1003;
+  const int ARG_MAX_LOG_FILE_SIZE               = 1004;
+  const int ARG_MAX_LOG_FILES                   = 1005;
+  const int ARG_PEER                            = 1006;
+  const int ARG_RPC_PORT                        = 1007;
+  const int ARG_RPC_SERVER_PUBLIC_KEY_FILE      = 1008;
+  const int ARG_RPC_SERVER_SECRET_KEY_FILE      = 1009;
+  const int ARG_RPC_AUTHORIZED_CLIENTS_FILE     = 1010;
+  const int ARG_RPC_SERVER_SAVE_PUBLIC_KEY_FILE = 1011;
+  const int ARG_P2P_PORT                        = 1012;
+  const int ARG_VERSION                         = 1013;
+  static struct option long_options[] =
+    { // NAME               ARGUMENT         FLAG   FLAGVALUE
+    {"db",                required_argument, 0,     ARG_DB                 },
+    {"detach",            no_argument,       &detach,1                     },
+    {"help",              no_argument,       0,     ARG_HELP               },
+    {"log-file",          required_argument, 0,     ARG_LOG_FILE           },
+    {"log-level",         required_argument, 0,     ARG_LOG_LEVEL          },
+    {"max-log-file-size", required_argument, 0,     ARG_MAX_LOG_FILE_SIZE  },
+    {"max-log-files",     required_argument, 0,     ARG_MAX_LOG_FILES      },
+    {"peer",              required_argument, 0,     ARG_PEER               },
+    {"rpc-bind-port",     required_argument, 0,     ARG_RPC_PORT           },
+    {"rpc-secure",        no_argument,       &rpc_secure, 1                },
+    {"rpc-server-public-key-file", required_argument, 0,
+                                   ARG_RPC_SERVER_PUBLIC_KEY_FILE          },
+    {"rpc-server-secret-key-file", required_argument, 0,
+                                   ARG_RPC_SERVER_SECRET_KEY_FILE          },
+    {"rpc-authorized-clients-file", required_argument, 0,
+                                   ARG_RPC_AUTHORIZED_CLIENTS_FILE         },
+    {"rpc-server-save-public-key-file", required_argument, 0,
+                                   ARG_RPC_SERVER_SAVE_PUBLIC_KEY_FILE     },
+    {"p2p-bind-port",     required_argument, 0,     ARG_P2P_PORT           },
+    {"version",           no_argument,       0,     ARG_VERSION            },
+    {0, 0, 0, 0}
+    };
+
+  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+    switch (c) {
+
+      case ARG_DB: {
+        db_name = optarg;
+        break;
+      }
+
+      case ARG_HELP: {
+        std::cout << version << "\n\n" <<
+          usage( db_name, logfile, rpc_server_save_public_key_file, rpc_port,
+                 p2p_port );
         return EXIT_SUCCESS;
       }
 
@@ -756,8 +805,23 @@ int main( int argc, char **argv ) {
         break;
       }
 
-      case ARG_RPC_PUBLIC_KEY_FILE: {
-        rpc_public_key_file = optarg;
+      case ARG_RPC_SERVER_PUBLIC_KEY_FILE: {
+        rpc_server_public_key_file = optarg;
+        break;
+      }
+
+      case ARG_RPC_SERVER_SECRET_KEY_FILE: {
+        rpc_server_secret_key_file = optarg;
+        break;
+      }
+
+      case ARG_RPC_AUTHORIZED_CLIENTS_FILE: {
+        rpc_authorized_clients_file = optarg;
+        break;
+      }
+
+      case ARG_RPC_SERVER_SAVE_PUBLIC_KEY_FILE: {
+        rpc_server_save_public_key_file = optarg;
         break;
       }
 
@@ -803,6 +867,10 @@ int main( int argc, char **argv ) {
         return EXIT_SUCCESS;
       }
 
+      case '?': {
+        ++num_err;
+        break;
+      }
     }
   }
 
@@ -813,9 +881,61 @@ int main( int argc, char **argv ) {
     return EXIT_FAILURE;
   }
 
-  if (not rpc_public_key_file.empty() && not rpc_secure) {
+  if (num_err) {
+    std::cerr << "Erros during parsing command line\n"
+              << "Command line: " + cmdline.str() << '\n'
+              << usage( db_name, logfile,rpc_server_save_public_key_file,
+                        rpc_port, p2p_port );
+    return EXIT_FAILURE;
+  }
+
+  if ((not rpc_server_public_key_file.empty() ||
+       not rpc_server_secret_key_file.empty() ||
+       not rpc_authorized_clients_file.empty()) &&
+       not rpc_secure)
+  {
     std::cerr << "Need --rpc-secure to secure RPC channel.\n";
     return EXIT_FAILURE;
+  }
+
+  if ((not rpc_server_public_key_file.empty() &&
+       rpc_server_secret_key_file.empty()) ||
+      (rpc_server_public_key_file.empty() &&
+       not rpc_server_secret_key_file.empty()))
+  {
+    std::cerr << "Need --rpc-authorized-clients-file for authorized RPC "
+                 "clients.\n";
+    return EXIT_FAILURE;
+  }
+
+  if (detach) {
+    // Fork the current process. The parent process continues with a process ID
+    // greater than 0.  A process ID lower than 0 indicates a failure in either
+    // process.
+    pid_t pid = fork();
+    if (pid > 0) {
+      std::cout << "Running in daemon mode. Forked PID: " << pid
+                << ". See the log file for details." << std::endl;
+      return EXIT_SUCCESS;
+    } else if (pid < 0) {
+      return EXIT_FAILURE;
+    }
+
+    // Generate a session ID for the child process and ensure it is valid.
+    if (setsid() < 0) {
+      // Log failure and exit
+      std::cerr << "Could not generate session ID for child process\n";
+      // If a new session ID could not be generated, we must terminate the child
+      // process or it will be orphaned.
+      return EXIT_FAILURE;
+    }
+
+    // A daemon cannot use the terminal, so close standard file descriptors for
+    // security reasons and also because ctest hangs in daemon mode waiting for
+    // stdout and stderr to be closed.
+    close( STDIN_FILENO );
+    close( STDOUT_FILENO );
+    close( STDERR_FILENO );
   }
 
   epee::set_console_color( epee::console_color_green, /* bright = */ false );
@@ -831,27 +951,66 @@ int main( int argc, char **argv ) {
   piac::setup_logging( logfile, log_level, /* console_logging = */ false,
                        max_log_file_size, max_log_files );
 
-  zmqpp::curve::keypair server_keys;
+  MINFO( "Command line: " + cmdline.str() );
+
+  // setup RPC security
+  int rpc_ironhouse = 1;
+  zmqpp::curve::keypair rpc_server_keys;
   if (rpc_secure) {
-    server_keys = zmqpp::curve::generate_keypair();
-    epee::set_console_color( epee::console_color_green, /* bright = */ false );
-    std::cout << "Connections to this server are secure.\n";
-    epee::set_console_color( epee::console_color_white, /* bright = */false );
-    std::cout << "Public key: " << server_keys.public_key << '\n';
-    epee::set_console_color( epee::console_color_default, /* bright = */false );
-    MINFO( "Connections to this server are secure" );
-    MINFO( "Public key: " << server_keys.public_key  );
-    save_public_key( rpc_public_key_file, server_keys.public_key );
+    load_server_key( rpc_server_public_key_file, rpc_server_keys.public_key );
+    load_server_key( rpc_server_secret_key_file, rpc_server_keys.secret_key );
+    load_client_keys( rpc_authorized_clients_file, rpc_authorized_clients );
+    // fallback to stonehouse if needed
+    if (rpc_server_keys.secret_key.empty() ||
+        rpc_server_keys.public_key.empty() ||
+        rpc_authorized_clients.empty())
+    {
+      rpc_ironhouse = 0;
+      if (rpc_server_keys.secret_key.empty() ||
+          rpc_server_keys.public_key.empty())
+      {
+        rpc_server_keys = zmqpp::curve::generate_keypair();
+        save_public_key( rpc_server_save_public_key_file,
+                         rpc_server_keys.public_key );
+      }
+      rpc_authorized_clients.clear();
+    }
+  }
+
+  // echo RPC security configured
+  if (rpc_secure) {
+    if (rpc_ironhouse) {
+      epee::set_console_color( epee::console_color_green, /*bright=*/ false );
+      std::string ironhouse( "Connections to this server are secure: "
+        "Only authenticated connections are accepted." );
+      std::cout << ironhouse << '\n';
+      epee::set_console_color( epee::console_color_white, /*bright=*/false );
+      MINFO( ironhouse );
+    } else {
+      std::string stonehouse( "Connections to this server are secure but not "
+        "authenticated: ALL client connections are accepted." );
+      epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
+      std::cout << stonehouse << '\n';
+      epee::set_console_color( epee::console_color_white, /*bright=*/false );
+      MINFO( stonehouse );
+      std::cout << "RPC server public key: "
+                << rpc_server_keys.public_key << '\n';
+    }
   } else {
     epee::set_console_color( epee::console_color_red, /* bright = */ false );
-    std::cout << "WARNING: Connections to this server are not secure.\n";
-    epee::set_console_color( epee::console_color_default, /* bright = */false );
-    MWARNING( "Connections to this server are not secure" );
+    std::string grasslands( "WARNING: Connections to this server are not "
+      "secure" );
+    std::cout << grasslands << '\n';
+    MWARNING( grasslands );
+  }
+  epee::set_console_color( epee::console_color_default, /* bright = */false );
+
+  if (rpc_secure) {
+    MINFO( "RPC server public key: " << rpc_server_keys.public_key );
   }
 
   if (detach) {
     MINFO( "Forked PID: " << getpid() );
-    if (rpc_secure) MINFO( "Public key: " << server_keys.public_key  );
   }
 
   // initialize (thread-safe) zmq contexts
@@ -875,7 +1034,8 @@ int main( int argc, char **argv ) {
 
   threads.emplace_back( db_thread,
     std::ref(ctx_db), db_name, rpc_port, use_strict_ports, std::ref(my_peers),
-    std::ref(my_hashes), rpc_secure, std::ref(server_keys) );
+    std::ref(my_hashes), rpc_secure, std::ref(rpc_server_keys),
+    std::ref(rpc_authorized_clients) );
 
   // wait for all threads to finish
   for (auto& t : threads) t.join();

@@ -1,0 +1,3 @@
+server localhost:22192
+peers
+exit
