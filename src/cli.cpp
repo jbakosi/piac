@@ -536,7 +536,7 @@ int main( int argc, char **argv ) {
   if (rpc_secure) {
     piac::load_key( rpc_server_public_key_file, rpc_server_public_key );
     assert( not rpc_server_public_key.empty() );
-    assert( rpc_server_public_key.size() == 50 );
+    assert( rpc_server_public_key.size() == 40 );
     piac::load_key( rpc_client_public_key_file, rpc_client_keys.public_key );
     piac::load_key( rpc_client_secret_key_file, rpc_client_keys.secret_key );
     // fallback to stonehouse if needed
