@@ -59,6 +59,32 @@ message(STATUS "Found ${PROCESSOR_COUNT} PEs")
 
 set(PIAC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+macro (add_compiler_flag flag)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flag}")
+endmacro (add_compiler_flag)
+
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+
+  add_compiler_flag("-fcolor-diagnostics")
+  add_compiler_flag("-Weverything")
+  add_compiler_flag("-Wno-c++98-compat")
+  add_compiler_flag("-Wno-exit-time-destructors")
+  add_compiler_flag("-Wno-global-constructors")
+  add_compiler_flag("-Wno-ctad-maybe-unsupported")
+
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+
+  add_compiler_flag("-fdiagnostics-color")
+  #add_compiler_flag("-Wall")
+  #add_compiler_flag("-Wextra")
+
+endif()
+
+# Echo compiler flags
+message(STATUS "C compiler flags: '${CMAKE_C_FLAGS}'")
+message(STATUS "C++ compiler flags: '${CMAKE_CXX_FLAGS}'")
+message(STATUS "Executable linker flags: '${CMAKE_EXE_LINKER_FLAGS}'")
+
 #### piac external libraries
 
 # Set external libraries install directory
@@ -105,14 +131,25 @@ find_package(OpenSSL REQUIRED)
 
 #### piac
 
-add_library(db ${PIAC_SOURCE_DIR}/db.cpp
-               ${PIAC_SOURCE_DIR}/jsonbase.cpp)
+add_library(db ${PIAC_SOURCE_DIR}/db.cpp)
 target_include_directories(db PUBLIC ${PIAC_SOURCE_DIR}
                                      ${TPL_DIR}/include
                                      ${RAPIDJSON_INCLUDE_DIRS}
                                      ${cryptopp_INCLUDE_DIRS})
 set_target_properties(db PROPERTIES LIBRARY_OUTPUT_NAME piac_db)
 install(TARGETS db
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+add_library(document ${PIAC_SOURCE_DIR}/document.cpp
+                     ${PIAC_SOURCE_DIR}/jsonbase.cpp)
+target_include_directories(document PUBLIC ${PIAC_SOURCE_DIR}
+                                           ${TPL_DIR}/include
+                                           ${RAPIDJSON_INCLUDE_DIRS}
+                                           ${cryptopp_INCLUDE_DIRS})
+set_target_properties(document PROPERTIES LIBRARY_OUTPUT_NAME piac_document)
+install(TARGETS document
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
@@ -158,6 +195,7 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
                       db
+                      document
                       logging_util
                       string_util
                       crypto_util

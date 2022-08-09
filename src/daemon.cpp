@@ -4,7 +4,25 @@
 #include <mutex>
 #include <condition_variable>
 
+#include "macro.hpp"
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wundef"
+  #pragma clang diagnostic ignored "-Wpadded"
+  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
+  #pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+  #pragma clang diagnostic ignored "-Wdocumentation"
+  #pragma clang diagnostic ignored "-Wweak-vtables"
+#endif
+
 #include <zmqpp/zmqpp.hpp>
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #include <zmqpp/curve.hpp>
 
 #include <getopt.h>
@@ -15,12 +33,14 @@
 #include "logging_util.hpp"
 #include "db.hpp"
 
-std::mutex g_hashes_mtx;
-std::condition_variable g_hashes_cv;
-bool g_hashes_access = false;
+namespace piac {
+
+static std::mutex g_hashes_mtx;
+static std::condition_variable g_hashes_cv;
+static bool g_hashes_access = false;
 
 // *****************************************************************************
-void
+static void
 db_update_hashes( const std::string& db_name,
                   std::unordered_set< std::string >& my_hashes )
 {
@@ -35,7 +55,7 @@ db_update_hashes( const std::string& db_name,
 }
 
 // *****************************************************************************
-void db_client_op(
+static void db_client_op(
   zmqpp::socket& client,
   zmqpp::socket& db_p2p,
   const std::string& db_name,
@@ -130,7 +150,7 @@ void db_client_op(
 }
 
 // *****************************************************************************
-void
+static void
 db_peer_op( const std::string& db_name,
             zmqpp::message& msg,
             zmqpp::socket& db_p2p,
@@ -197,7 +217,7 @@ db_peer_op( const std::string& db_name,
 }
 
 // *****************************************************************************
-void
+static void
 try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
 {
   if (use_strict_ports) {
@@ -209,14 +229,14 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
       sock.bind( "tcp://*:" + std::to_string(port) );
       return;
     }
-    catch ( zmqpp::exception& e ) {}
+    catch ( zmqpp::exception& ) {}
   } while (++port < port+range );
   MERROR( "Could not bind to socket within range: ["
           << port << ',' << port+range << ')' );
 }
 
 // *****************************************************************************
-void
+[[noreturn]] static void
 db_thread( zmqpp::context& ctx_db,
            const std::string& db_name,
            int rpc_port,
@@ -287,16 +307,16 @@ db_thread( zmqpp::context& ctx_db,
 
     if (poller.poll(100)) {
       if (poller.has_input( db_p2p )) {
-        zmqpp::message msg;
-        db_p2p.receive( msg );
-        db_peer_op( db_name, msg, db_p2p, my_hashes );
+        zmqpp::message m;
+        db_p2p.receive( m );
+        db_peer_op( db_name, m, db_p2p, my_hashes );
       }
     }
   }
 }
 
 // *****************************************************************************
-zmqpp::socket
+static zmqpp::socket
 connect_peer( zmqpp::context& ctx, const std::string& addr ) {
   // create socket to connect to peers
   zmqpp::socket dealer( ctx, zmqpp::socket_type::dealer );
@@ -306,7 +326,7 @@ connect_peer( zmqpp::context& ctx, const std::string& addr ) {
 }
 
 // *****************************************************************************
-void
+static void
 p2p_bcast_peers( int p2p_port,
                  std::unordered_map< std::string, zmqpp::socket >& my_peers,
                  bool& to_bcast_peers )
@@ -326,7 +346,7 @@ p2p_bcast_peers( int p2p_port,
 }
 
 // *****************************************************************************
-void
+static void
 p2p_bcast_hashes( int p2p_port,
                   std::unordered_map< std::string, zmqpp::socket >& my_peers,
                   const std::unordered_set< std::string >& my_hashes,
@@ -353,7 +373,7 @@ p2p_bcast_hashes( int p2p_port,
 }
 
 // *****************************************************************************
-void
+static void
 p2p_send_db_requests(
   int p2p_port,
   std::unordered_map< std::string, zmqpp::socket >& my_peers,
@@ -378,7 +398,7 @@ p2p_send_db_requests(
 }
 
 // *****************************************************************************
-void
+static void
 p2p_answer_p2p( zmqpp::context& ctx_p2p,
                 zmqpp::socket& db_p2p,
                 zmqpp::message& msg,
@@ -483,7 +503,8 @@ p2p_answer_p2p( zmqpp::context& ctx_p2p,
   }
 }
 
-void
+// *****************************************************************************
+static void
 p2p_answer_ipc( zmqpp::message& msg,
                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
                 bool& to_bcast_hashes )
@@ -521,13 +542,14 @@ p2p_answer_ipc( zmqpp::message& msg,
 }
 
 // *****************************************************************************
-void p2p_thread( zmqpp::context& ctx_p2p,
-                 zmqpp::context& ctx_db,
-                 std::unordered_map< std::string, zmqpp::socket >& my_peers,
-                 const std::unordered_set< std::string >& my_hashes,
-                 int default_p2p_port,
-                 int p2p_port,
-                 bool use_strict_ports )
+[[noreturn]] static void
+p2p_thread( zmqpp::context& ctx_p2p,
+            zmqpp::context& ctx_db,
+            std::unordered_map< std::string, zmqpp::socket >& my_peers,
+            const std::unordered_set< std::string >& my_hashes,
+            int default_p2p_port,
+            int p2p_port,
+            bool use_strict_ports )
 {
   MLOG_SET_THREAD_NAME( "rpc" );
   MINFO( "rpc thread initialized" );
@@ -593,7 +615,7 @@ void p2p_thread( zmqpp::context& ctx_p2p,
 }
 
 // *****************************************************************************
-void
+static void
 save_public_key( const std::string& filename, const std::string& public_key ) {
   if (filename.empty()) return;
   std::ofstream f( filename );
@@ -607,7 +629,8 @@ save_public_key( const std::string& filename, const std::string& public_key ) {
 }
 
 // *****************************************************************************
-void load_server_key( const std::string& filename, std::string& key ) {
+static void
+load_server_key( const std::string& filename, std::string& key ) {
   if (filename.empty()) return;
   std::ifstream f( filename );
   if (not f.good()) {
@@ -623,8 +646,9 @@ void load_server_key( const std::string& filename, std::string& key ) {
 }
 
 // *****************************************************************************
-void load_client_keys( const std::string& filename,
-                       std::vector< std::string >& keys )
+static void
+load_client_keys( const std::string& filename,
+                  std::vector< std::string >& keys )
 {
   if (filename.empty()) return;
   std::ifstream f( filename );
@@ -645,7 +669,7 @@ void load_client_keys( const std::string& filename,
 }
 
 // *****************************************************************************
-std::string
+static std::string
 usage( const std::string& db_name,
        const std::string& logfile,
        const std::string& rpc_server_save_public_key_file,
@@ -706,6 +730,8 @@ usage( const std::string& db_name,
           "         Show version information\n\n";
 }
 
+} // piac::
+
 // *****************************************************************************
 // piac daemon main
 int main( int argc, char **argv ) {
@@ -755,28 +781,28 @@ int main( int argc, char **argv ) {
   const int ARG_P2P_PORT                        = 1012;
   const int ARG_VERSION                         = 1013;
   static struct option long_options[] =
-    { // NAME               ARGUMENT         FLAG   FLAGVALUE
-    {"db",                required_argument, 0,     ARG_DB                 },
-    {"detach",            no_argument,       &detach,1                     },
-    {"help",              no_argument,       0,     ARG_HELP               },
-    {"log-file",          required_argument, 0,     ARG_LOG_FILE           },
-    {"log-level",         required_argument, 0,     ARG_LOG_LEVEL          },
-    {"max-log-file-size", required_argument, 0,     ARG_MAX_LOG_FILE_SIZE  },
-    {"max-log-files",     required_argument, 0,     ARG_MAX_LOG_FILES      },
-    {"peer",              required_argument, 0,     ARG_PEER               },
-    {"rpc-bind-port",     required_argument, 0,     ARG_RPC_PORT           },
-    {"rpc-secure",        no_argument,       &rpc_secure, 1                },
-    {"rpc-server-public-key-file", required_argument, 0,
-                                   ARG_RPC_SERVER_PUBLIC_KEY_FILE          },
-    {"rpc-server-secret-key-file", required_argument, 0,
-                                   ARG_RPC_SERVER_SECRET_KEY_FILE          },
-    {"rpc-authorized-clients-file", required_argument, 0,
-                                   ARG_RPC_AUTHORIZED_CLIENTS_FILE         },
-    {"rpc-server-save-public-key-file", required_argument, 0,
-                                   ARG_RPC_SERVER_SAVE_PUBLIC_KEY_FILE     },
-    {"p2p-bind-port",     required_argument, 0,     ARG_P2P_PORT           },
-    {"version",           no_argument,       0,     ARG_VERSION            },
-    {0, 0, 0, 0}
+    {
+      { "db", required_argument, nullptr, ARG_DB },
+      { "detach", no_argument, &detach, 1 },
+      { "help", no_argument, nullptr, ARG_HELP },
+      { "log-file", required_argument, nullptr, ARG_LOG_FILE },
+      { "log-level", required_argument, nullptr, ARG_LOG_LEVEL },
+      { "max-log-file-size", required_argument, nullptr, ARG_MAX_LOG_FILE_SIZE },
+      { "max-log-files", required_argument, nullptr, ARG_MAX_LOG_FILES },
+      { "peer", required_argument, nullptr, ARG_PEER },
+      { "rpc-bind-port", required_argument, nullptr, ARG_RPC_PORT },
+      { "rpc-secure", no_argument, &rpc_secure, 1 },
+      { "rpc-server-public-key-file", required_argument, nullptr,
+        ARG_RPC_SERVER_PUBLIC_KEY_FILE },
+      { "rpc-server-secret-key-file", required_argument, nullptr,
+        ARG_RPC_SERVER_SECRET_KEY_FILE },
+      { "rpc-authorized-clients-file", required_argument, nullptr,
+        ARG_RPC_AUTHORIZED_CLIENTS_FILE },
+      { "rpc-server-save-public-key-file", required_argument, nullptr,
+        ARG_RPC_SERVER_SAVE_PUBLIC_KEY_FILE },
+      { "p2p-bind-port", required_argument, nullptr, ARG_P2P_PORT },
+      { "version", no_argument, nullptr, ARG_VERSION },
+      { nullptr, 0, nullptr, 0 }
     };
 
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
@@ -789,8 +815,8 @@ int main( int argc, char **argv ) {
 
       case ARG_HELP: {
         std::cout << version << "\n\n" <<
-          usage( db_name, logfile, rpc_server_save_public_key_file, rpc_port,
-                 p2p_port );
+          piac::usage( db_name, logfile, rpc_server_save_public_key_file,
+                       rpc_port, p2p_port );
         return EXIT_SUCCESS;
       }
 
@@ -884,8 +910,8 @@ int main( int argc, char **argv ) {
   if (num_err) {
     std::cerr << "Erros during parsing command line\n"
               << "Command line: " + cmdline.str() << '\n'
-              << usage( db_name, logfile,rpc_server_save_public_key_file,
-                        rpc_port, p2p_port );
+              << piac::usage( db_name, logfile,rpc_server_save_public_key_file,
+                              rpc_port, p2p_port );
     return EXIT_FAILURE;
   }
 
@@ -957,9 +983,12 @@ int main( int argc, char **argv ) {
   int rpc_ironhouse = 1;
   zmqpp::curve::keypair rpc_server_keys;
   if (rpc_secure) {
-    load_server_key( rpc_server_public_key_file, rpc_server_keys.public_key );
-    load_server_key( rpc_server_secret_key_file, rpc_server_keys.secret_key );
-    load_client_keys( rpc_authorized_clients_file, rpc_authorized_clients );
+    piac::load_server_key( rpc_server_public_key_file,
+                           rpc_server_keys.public_key );
+    piac::load_server_key( rpc_server_secret_key_file,
+                           rpc_server_keys.secret_key );
+    piac::load_client_keys( rpc_authorized_clients_file,
+                            rpc_authorized_clients );
     // fallback to stonehouse if needed
     if (rpc_server_keys.secret_key.empty() ||
         rpc_server_keys.public_key.empty() ||
@@ -970,8 +999,8 @@ int main( int argc, char **argv ) {
           rpc_server_keys.public_key.empty())
       {
         rpc_server_keys = zmqpp::curve::generate_keypair();
-        save_public_key( rpc_server_save_public_key_file,
-                         rpc_server_keys.public_key );
+        piac::save_public_key( rpc_server_save_public_key_file,
+                               rpc_server_keys.public_key );
       }
       rpc_authorized_clients.clear();
     }
@@ -1028,11 +1057,11 @@ int main( int argc, char **argv ) {
   // start threads
   std::vector< std::thread > threads;
 
-  threads.emplace_back( p2p_thread,
+  threads.emplace_back( piac::p2p_thread,
     std::ref(ctx_p2p), std::ref(ctx_db), std::ref(my_peers),
     std::ref(my_hashes), default_p2p_port, p2p_port, use_strict_ports );
 
-  threads.emplace_back( db_thread,
+  threads.emplace_back( piac::db_thread,
     std::ref(ctx_db), db_name, rpc_port, use_strict_ports, std::ref(my_peers),
     std::ref(my_hashes), rpc_secure, std::ref(rpc_server_keys),
     std::ref(rpc_authorized_clients) );

@@ -1,4 +1,21 @@
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wundef"
+  #pragma clang diagnostic ignored "-Wpadded"
+  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
+  #pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+  #pragma clang diagnostic ignored "-Wdocumentation"
+  #pragma clang diagnostic ignored "-Wweak-vtables"
+  #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
+#endif
+
 #include <zmqpp/zmqpp.hpp>
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #include <zmqpp/curve.hpp>
 
 #include <readline/history.h>
@@ -9,8 +26,55 @@
 #define MONERO
 
 #ifdef MONERO
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdeprecated-copy-dtor"
+  #pragma clang diagnostic ignored "-Wnon-virtual-dtor"
+  #pragma clang diagnostic ignored "-Wsuggest-override"
+  #pragma clang diagnostic ignored "-Wunused-template"
+  #pragma clang diagnostic ignored "-Wsign-conversion"
+  #pragma clang diagnostic ignored "-Wcast-qual"
+  #pragma clang diagnostic ignored "-Wheader-hygiene"
+  #pragma clang diagnostic ignored "-Wshadow"
+  #pragma clang diagnostic ignored "-Wshadow-field"
+  #pragma clang diagnostic ignored "-Wextra-semi"
+  #pragma clang diagnostic ignored "-Wextra-semi-stmt"
+  #pragma clang diagnostic ignored "-Wdocumentation"
+  #pragma clang diagnostic ignored "-Wunused-parameter"
+  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+  #pragma clang diagnostic ignored "-Wdouble-promotion"
+  #pragma clang diagnostic ignored "-Wsuggest-destructor-override"
+  #pragma clang diagnostic ignored "-Wreserved-id-macro"
+  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
+  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+  #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
+  #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+  #pragma clang diagnostic ignored "-Wold-style-cast"
+  #pragma clang diagnostic ignored "-Wshadow-field-in-constructor"
+  #pragma clang diagnostic ignored "-Wswitch-enum"
+  #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+  #pragma clang diagnostic ignored "-Wcovered-switch-default"
+  #pragma clang diagnostic ignored "-Wdeprecated-dynamic-exception-spec"
+  #pragma clang diagnostic ignored "-Wmissing-noreturn"
+  #pragma clang diagnostic ignored "-Wunused-variable"
+  #pragma clang diagnostic ignored "-Wused-but-marked-unused"
+  #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+  #pragma clang diagnostic ignored "-Winconsistent-missing-destructor-override"
+  #pragma clang diagnostic ignored "-Wredundant-parens"
+  #pragma clang diagnostic ignored "-Wunused-exception-parameter"
+  #pragma clang diagnostic ignored "-Wreorder-ctor"
+  #pragma clang diagnostic ignored "-Wweak-vtables"
+  #pragma clang diagnostic ignored "-Wshift-count-overflow"
+#endif
+
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include "wallet/monero_wallet_full.h"
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #endif
 
 #include "project_config.hpp"
@@ -21,8 +85,10 @@
 #define REQUEST_TIMEOUT     3000   //  msecs, (> 1000!)
 #define REQUEST_RETRIES     5      //  before we abandon trying to send
 
+namespace piac {
+
 // *****************************************************************************
-zmqpp::socket
+static zmqpp::socket
 daemon_socket( zmqpp::context& ctx,
                const std::string& host,
                const std::string& rpc_server_public_key,
@@ -36,7 +102,7 @@ daemon_socket( zmqpp::context& ctx,
       sock.set( zmqpp::socket_option::curve_server_key, rpc_server_public_key );
       sock.set( zmqpp::socket_option::curve_public_key, client_keys.public_key );
       sock.set( zmqpp::socket_option::curve_secret_key, client_keys.secret_key );
-    } catch ( zmqpp::exception& e ) {}
+    } catch ( zmqpp::exception& ) {}
   }
 
   sock.connect( "tcp://" + host );
@@ -46,7 +112,7 @@ daemon_socket( zmqpp::context& ctx,
 }
 
 // *****************************************************************************
-std::string
+static std::string
 pirate_send( const std::string& cmd,
              zmqpp::context& ctx,
              const std::string& host,
@@ -95,14 +161,15 @@ pirate_send( const std::string& cmd,
 }
 
 // *****************************************************************************
-void send_cmd( std::string cmd,
-               zmqpp::context& ctx,
-               const std::string& host,
-               const std::string& rpc_server_public_key,
-               const zmqpp::curve::keypair& client_keys
-               #ifdef MONERO
+static void
+send_cmd( std::string cmd,
+          zmqpp::context& ctx,
+          const std::string& host,
+          const std::string& rpc_server_public_key,
+          const zmqpp::curve::keypair& client_keys
+          #ifdef MONERO
              , const std::unique_ptr< monero_wallet_full >& wallet
-               #endif
+          #endif
 )
 {
   piac::trim( cmd );
@@ -131,7 +198,8 @@ void send_cmd( std::string cmd,
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
 
 // *****************************************************************************
-std::string color_string( const std::string &s, COLOR color = GRAY ) {
+static std::string
+color_string( const std::string &s, COLOR color = GRAY ) {
   std::string ret;
   if (color == RED) ret = "\033[0;31m";
   if (color == GREEN) ret = "\033[0;32m";
@@ -143,7 +211,7 @@ std::string color_string( const std::string &s, COLOR color = GRAY ) {
 
 #ifdef MONERO
 // *****************************************************************************
-[[nodiscard]] std::unique_ptr< monero_wallet_full >
+[[nodiscard]] static std::unique_ptr< monero_wallet_full >
 create_wallet() {
   MDEBUG( "new" );
   auto w = monero_wallet_full::create_wallet_random( "", "",
@@ -158,7 +226,7 @@ create_wallet() {
 }
 
 // *****************************************************************************
-void
+static void
 show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
   MDEBUG( "keys" );
   if (not wallet) {
@@ -174,7 +242,7 @@ show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
 }
 
 // *****************************************************************************
-[[nodiscard]] std::unique_ptr< monero_wallet_full >
+[[nodiscard]] static std::unique_ptr< monero_wallet_full >
 switch_user( const std::string& mnemonic ) {
   MDEBUG( "user" );
   assert( not mnemonic.empty() );
@@ -185,7 +253,8 @@ switch_user( const std::string& mnemonic ) {
 }
 
 // *****************************************************************************
-void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
+static void
+show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
   MDEBUG( "user" );
   if (not wallet) {
     std::cout << "No active user id (wallet). See 'new' or 'user'.\n";
@@ -196,9 +265,10 @@ void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
 #endif
 
 // ****************************************************************************
-[[nodiscard]] int wordcount( const std::string& s ) {
+[[nodiscard]] static int
+wordcount( const std::string& s ) {
   auto str = s.data();
-  if (str == NULL) return 0;
+  if (str == nullptr) return 0;
   bool inSpaces = true;
   int numWords = 0;
   while (*str != '\0') {
@@ -214,7 +284,8 @@ void show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
 }
 
 // *****************************************************************************
-void load_key( const std::string& filename, std::string& key ) {
+static void
+load_key( const std::string& filename, std::string& key ) {
   if (filename.empty() || not key.empty()) return;
   std::ifstream f( filename );
   if (not f.good()) {
@@ -230,7 +301,7 @@ void load_key( const std::string& filename, std::string& key ) {
 }
 
 // *****************************************************************************
-std::string
+static std::string
 usage( const std::string& logfile ) {
   return "Usage: " + piac::cli_executable() + " [OPTIONS]\n\n"
          "OPTIONS\n"
@@ -273,6 +344,8 @@ usage( const std::string& logfile ) {
          "         Show version information\n\n";
 }
 
+} // piac::
+
 // *****************************************************************************
 int main( int argc, char **argv ) {
 
@@ -310,28 +383,28 @@ int main( int argc, char **argv ) {
   const int ARG_RPC_SERVER_PUBLIC_KEY      = 1008;
   const int ARG_RPC_SERVER_PUBLIC_KEY_FILE = 1009;
   static struct option long_options[] =
-    { // NAME                ARGUMENT         FLAG FLAGVALUE
-    {"help",               no_argument,       0,   ARG_HELP               },
-    {"log-file",           required_argument, 0,   ARG_LOG_FILE           },
-    {"log-level",          required_argument, 0,   ARG_LOG_LEVEL          },
-    {"max-log-file-size",  required_argument, 0,   ARG_MAX_LOG_FILE_SIZE  },
-    {"max-log-files",      required_argument, 0,   ARG_MAX_LOG_FILES      },
-    {"rpc-secure",         no_argument,       &rpc_secure, 1              },
-    {"rpc-client-public-key-file", required_argument, 0,
-                                   ARG_RPC_CLIENT_PUBLIC_KEY_FILE},
-    {"rpc-client-secret-key-file", required_argument, 0,
-                                   ARG_RPC_CLIENT_SECRET_KEY_FILE},
-    {"rpc-server-public-key", required_argument, 0,
-                              ARG_RPC_SERVER_PUBLIC_KEY},
-    {"rpc-server-public-key-file",required_argument, 0,
-                                  ARG_RPC_SERVER_PUBLIC_KEY_FILE},
-    {"version",            no_argument,       0,   ARG_VERSION            },
-    {0, 0, 0, 0}
+    {
+      { "help", no_argument, nullptr, ARG_HELP },
+      { "log-file", required_argument, nullptr, ARG_LOG_FILE },
+      { "log-level", required_argument, nullptr, ARG_LOG_LEVEL },
+      { "max-log-file-size", required_argument, nullptr, ARG_MAX_LOG_FILE_SIZE },
+      { "max-log-files", required_argument, nullptr, ARG_MAX_LOG_FILES },
+      { "rpc-secure", no_argument, &rpc_secure, 1 },
+      { "rpc-client-public-key-file", required_argument, nullptr,
+        ARG_RPC_CLIENT_PUBLIC_KEY_FILE},
+      { "rpc-client-secret-key-file", required_argument, nullptr,
+        ARG_RPC_CLIENT_SECRET_KEY_FILE},
+      { "rpc-server-public-key", required_argument, nullptr,
+        ARG_RPC_SERVER_PUBLIC_KEY},
+      { "rpc-server-public-key-file",required_argument, nullptr,
+        ARG_RPC_SERVER_PUBLIC_KEY_FILE},
+      { "version", no_argument, nullptr, ARG_VERSION },
+      { nullptr, 0, nullptr, 0 }
     };
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
       case ARG_HELP: {
-        std::cout << version << "\n\n" << usage( logfile );
+        std::cout << version << "\n\n" << piac::usage( logfile );
         return EXIT_SUCCESS;
       }
 
@@ -407,7 +480,7 @@ int main( int argc, char **argv ) {
   if (num_err) {
     std::cerr << "Erros during parsing command line\n"
               << "Command line: " + cmdline.str() << '\n'
-              << usage( logfile );
+              << piac::usage( logfile );
     return EXIT_FAILURE;
   }
 
@@ -461,11 +534,11 @@ int main( int argc, char **argv ) {
   int rpc_ironhouse = 1;
   zmqpp::curve::keypair rpc_client_keys;
   if (rpc_secure) {
-    load_key( rpc_server_public_key_file, rpc_server_public_key );
+    piac::load_key( rpc_server_public_key_file, rpc_server_public_key );
     assert( not rpc_server_public_key.empty() );
     assert( rpc_server_public_key.size() == 50 );
-    load_key( rpc_client_public_key_file, rpc_client_keys.public_key );
-    load_key( rpc_client_secret_key_file, rpc_client_keys.secret_key );
+    piac::load_key( rpc_client_public_key_file, rpc_client_keys.public_key );
+    piac::load_key( rpc_client_secret_key_file, rpc_client_keys.secret_key );
     // fallback to stonehouse if needed
     if (rpc_client_keys.secret_key.empty() ||
         rpc_client_keys.public_key.empty())
@@ -505,8 +578,8 @@ int main( int argc, char **argv ) {
   zmqpp::context ctx;
 
   char* buf;
-  std::string prompt = color_string( "piac", GREEN ) +
-                       color_string( "> ",YELLOW );
+  std::string prompt = color_string( "piac", piac::GREEN ) +
+                       color_string( "> ", piac::YELLOW );
 
   while ((buf = readline( prompt.c_str() ) ) != nullptr) {
 
@@ -533,9 +606,10 @@ int main( int argc, char **argv ) {
     } else if (buf[0]=='d' && buf[1]=='b') {
 
       #ifdef MONERO
-      send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys, wallet );
+      piac::send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys,
+                      wallet );
       #else
-      send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys );
+      piac::send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys );
       #endif
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
@@ -596,22 +670,23 @@ int main( int argc, char **argv ) {
     } else if (!strcmp(buf,"keys")) {
 
       #ifdef MONERO
-      show_wallet_keys( wallet );
+      piac::show_wallet_keys( wallet );
       #endif
 
     } else if (!strcmp(buf,"new")) {
 
       #ifdef MONERO
-      wallet = create_wallet();
+      wallet = piac::create_wallet();
       #endif
 
     } else if (!strcmp(buf,"peers")) {
 
       #ifdef MONERO
-      send_cmd( "peers", ctx, host, rpc_server_public_key, rpc_client_keys,
-                wallet );
+      piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
+                      rpc_client_keys, wallet );
       #else
-      send_cmd( "peers", ctx, host, rpc_server_public_key, rpc_client_keys );
+      piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
+                      rpc_client_keys );
       #endif
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
@@ -620,11 +695,11 @@ int main( int argc, char **argv ) {
       std::string mnemonic( buf );
       mnemonic.erase( 0, 5 );
       if (mnemonic.empty()) {
-        show_user( wallet );
-      } else if (wordcount(mnemonic) != 25) {
+        piac::show_user( wallet );
+      } else if (piac::wordcount(mnemonic) != 25) {
         std::cout << "Need 25 words\n";
       } else {
-        wallet = switch_user( mnemonic );
+        wallet = piac::switch_user( mnemonic );
       }
       #endif
 

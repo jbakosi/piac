@@ -4,6 +4,7 @@
 #include "logging_util.hpp"
 #include "crypto_util.hpp"
 #include "db.hpp"
+#include "document.hpp"
 
 // ****************************************************************************
 Xapian::doccount
@@ -53,7 +54,7 @@ piac::add_document( const std::string& author,
   indexer.increase_termpos();
   indexer.index_text( ndoc.keywords() );
   // Add value fields
-  doc.add_value( XapianValues::PRICE, std::to_string( ndoc.price() ) );
+  doc.add_value( 1, std::to_string( ndoc.price() ) );
   // Generate a hash of the doc fields and store it in the document
   ndoc.author( author );
   auto entry = ndoc.serialize();

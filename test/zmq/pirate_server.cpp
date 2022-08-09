@@ -1,12 +1,28 @@
 // Server that simulates connection problems for a Lazy Pirate client
 
-#include <zmqpp//zmqpp.hpp>
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wundef"
+  #pragma clang diagnostic ignored "-Wpadded"
+  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
+  #pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+  #pragma clang diagnostic ignored "-Wdocumentation"
+  #pragma clang diagnostic ignored "-Wweak-vtables"
+#endif
+
+#include <zmqpp/zmqpp.hpp>
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #include <unistd.h>
 
 #include "logging_util.hpp"
 
 // Provide random number from 0..(num-1)
-#define within(num) (int) ((float) (num) * random () / (RAND_MAX + 1.0))
+#define within(num) (int)((float) (num) * random () / (RAND_MAX + 1.0))
 
 int main( int argc, char** argv ) {
 
@@ -60,7 +76,7 @@ int main( int argc, char** argv ) {
     MINFO( "Forked PID: " << pid );
   }
 
-  srandom ((unsigned)time(NULL));
+  srandom( static_cast<unsigned>( time(nullptr) ) );
 
   std::string server_port = "5555";
   zmqpp::context ctx;
@@ -70,6 +86,13 @@ int main( int argc, char** argv ) {
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
   std::cout << "Server bound to port " << server_port << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
+
+  #if defined(__clang__)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wold-style-cast"
+    #pragma clang diagnostic ignored "-Wdouble-promotion"
+    #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+  #endif
 
   int cycles = 0;
   while (1) {
@@ -91,6 +114,10 @@ int main( int argc, char** argv ) {
     sleep(1); // do some heavy work
     server.send( request );
   }
+
+  #if defined(__clang__)
+    #pragma clang diagnostic pop
+  #endif
 
   return EXIT_SUCCESS;
 }

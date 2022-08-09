@@ -9,7 +9,8 @@
 namespace piac {
 
 class JSONBase {
-  public:	
+  public:
+    virtual ~JSONBase() = default;
     bool deserializeFromFile( const std::string& filePath );
     bool serializeToFile( const std::string& filePath ) const;
     [[nodiscard]] virtual std::string serialize() const;

@@ -8,13 +8,16 @@
 #include <chrono>
 #include <cassert>
 
-int randBetween( int min, int max ) {
-  return (rand() % (min - max) + min);
+static std::size_t
+randBetween( std::size_t min, std::size_t max ) {
+  return static_cast< std::size_t >( rand() ) % (max - min) + min;
 }
 
-double randBetween( double min, double max ) {
+static double
+randDoubleBetween( double min, double max ) {
   assert( min < max );
-  return min + static_cast< double >( rand() ) / static_cast< double >( RAND_MAX/(max-min) );
+  return min + static_cast< double >( rand() ) /
+               static_cast< double >( RAND_MAX/(max-min) );
 }
 
 using namespace std;
@@ -30,7 +33,8 @@ int main( int argc, char** argv ) {
   prefix += '/';
 
   using namespace chrono;
-  srand( duration_cast< microseconds >( steady_clock::now().time_since_epoch() ).count() );
+  srand( static_cast< unsigned int >( duration_cast< microseconds >
+          ( steady_clock::now().time_since_epoch() ).count() ) );
   vector<string> pronoun;
   vector<string> adverb;
   vector<string> verb;
@@ -77,7 +81,7 @@ int main( int argc, char** argv ) {
   _noun.close();
 
   auto lastname = adverb[randBetween(0,adverb.size()-1)];
-  lastname[0] = toupper( lastname[0] );
+  lastname[0] = static_cast< char >( toupper( lastname[0] ) );
 
   auto thing = [&](){ return noun[randBetween(0,noun.size()-1)]; };
   auto adj = [&](){ return adjective[randBetween(0,adjective.size()-1)]; };
@@ -90,7 +94,7 @@ int main( int argc, char** argv ) {
   };
 
   auto product = adj();
-  product[0] = toupper( product[0] );
+  product[0] = static_cast< char >( toupper( product[0] ) );
   product += ' ' + thing();
 
   auto sentence = [&]( int num ){
@@ -112,13 +116,13 @@ int main( int argc, char** argv ) {
   "title": ")" + product + R"(",
   "description": ")" + sentence(10) + R"(",
   "category": ")" + thing() + R"(",
-  "price": )" + std::to_string( randBetween( 0.0, 11.0 ) ) + R"(,
+  "price": )" + std::to_string( randDoubleBetween( 0.0, 11.0 ) ) + R"(,
   "condition": ")" + adj() + R"(",
   "shipping": "pickup, delivery, convert to array",
   "format": "buy it now",
   "location": "home",
   "keywords": ")" + keyword(4) + R"(",
-  "id": )" + std::to_string( randBetween( 0, RAND_MAX) ) + R"(
+  "id": )" + std::to_string( randBetween(0, RAND_MAX) ) + R"(
 })" );
 
   cout << json_entry << '\n';

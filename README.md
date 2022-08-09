@@ -36,7 +36,7 @@ Currently, the basics are prototyped. At this point, the app consists of a daemo
 - [x] add some more details to readme
 - [x] encrypt socket between cli and daemon, stonehouse
 - [x] encrypt socket between cli and daemon, ironhouse
-- [ ] build/test with clang
+- [x] build/test with clang
 - [ ] add `-Wall` to build system
 - [ ] add valgrind tests
 - [ ] set up automatic generation of code coverage
