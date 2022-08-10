@@ -230,7 +230,8 @@ try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
       return;
     }
     catch ( zmqpp::exception& ) {}
-  } while (++port < port+range );
+    ++port;
+  } while (port < port+range );
   MERROR( "Could not bind to socket within range: ["
           << port << ',' << port+range << ')' );
 }

@@ -27,9 +27,9 @@ particular order:
 - [x] encrypt socket between cli and daemon, stonehouse
 - [x] encrypt socket between cli and daemon, ironhouse
 - [x] build/test with clang
-- [ ] add `-Wall` to build system
+- [x] add `-Wall` to build system
 - [ ] allow connecting to I2P via i2pd
-- [ ] implement more sophisticated p2p commmunication basde eon white/gray lists
+- [ ] implement more sophisticated p2p commmunication based eon white/gray lists
 - [ ] add valgrind tests
 - [ ] set up automatic generation of code coverage
 - [ ] add detailed contributing.md

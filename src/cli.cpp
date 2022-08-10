@@ -1,3 +1,5 @@
+#include "macro.hpp"
+
 #if defined(__clang__)
   #pragma clang diagnostic push
   #pragma clang diagnostic ignored "-Wundef"
@@ -22,10 +24,6 @@
 #include <readline/readline.h>
 #include <getopt.h>
 #include <unistd.h>
-
-#define MONERO
-
-#ifdef MONERO
 
 #if defined(__clang__)
   #pragma clang diagnostic push
@@ -66,15 +64,22 @@
   #pragma clang diagnostic ignored "-Wreorder-ctor"
   #pragma clang diagnostic ignored "-Wweak-vtables"
   #pragma clang diagnostic ignored "-Wshift-count-overflow"
+#elif defined(STRICT_GNUC)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wunused-parameter"
+  #pragma GCC diagnostic ignored "-Wreorder"
 #endif
 
+#define MONERO
+#ifdef MONERO
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include "wallet/monero_wallet_full.h"
+#endif
 
 #if defined(__clang__)
   #pragma clang diagnostic pop
-#endif
-
+#elif defined(STRICT_GNUC)
+  #pragma GCC diagnostic pop
 #endif
 
 #include "project_config.hpp"

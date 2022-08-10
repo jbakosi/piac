@@ -75,8 +75,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
   add_compiler_flag("-fdiagnostics-color")
-  #add_compiler_flag("-Wall")
-  #add_compiler_flag("-Wextra")
+  add_compiler_flag("-Wall")
+  add_compiler_flag("-Wextra")
 
 endif()
 
