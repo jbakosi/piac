@@ -73,7 +73,7 @@ set_tests_properties(daemon3_zmq_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "zmq")
 
-add_test(NAME wait4comm_zmq COMMAND sleep 0)
+add_test(NAME wait4comm_zmq COMMAND sleep 1)
 set_tests_properties(wait4comm_zmq PROPERTIES LABELS "zmq")
 
 add_test(NAME daemon_zmq_grep COMMAND ${GREP} "Number of peers: 2"
