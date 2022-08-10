@@ -53,7 +53,7 @@ cd piac/build
 cd piac/build
 ./piac-cli --help
 ```
-See [doc/rpc-secure.md](doc/rpc-secure.md) for other ways to run.
+See [doc/secure-rpc.md](doc/secure-rpc.md) for other ways to run.
 
 ## Pronounce
 [[ˈpijɒt͡s]](https://en.wiktionary.org/wiki/piac)
