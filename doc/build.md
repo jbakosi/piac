@@ -39,9 +39,9 @@ You can also pass `-GNinja` to _both_ cmake calls:
 
 ```sh
 # build external libraries
-mkdir -p external/build && cd external/build && cmake -GNinja .. && make && cd -
+mkdir -p external/build && cd external/build && cmake -GNinja .. && ninja && cd -
 # build piac
-mkdir build && cd build && cmake -GNinja .. && make && cd -
+mkdir build && cd build && cmake -GNinja .. && ninja && cd -
 # test piac (optional)
 cd build && ctest
 ```

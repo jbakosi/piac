@@ -92,7 +92,7 @@ $ ./piac-daemon --rpc-secure --rpc-server-public-key-file server.pub --rpc-serve
 $ ./piac-cli --rpc-secure --rpc-server-public-key-file server.pub --rpc-client-public-key-file client.pub --rpc-client-secret-key-file client
 ```
 The file `authorized_clients` can contain multiple clients' public keys, a new
-on on each line.
+one on each line.
 
 __Note:__ Always use an encrypted communication channel to distribute keys,
 e.g., via rsync or scp.
