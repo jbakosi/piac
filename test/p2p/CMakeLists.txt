@@ -106,19 +106,20 @@ set_tests_properties(cli_wordcount_p2p PROPERTIES
                      PASS_REGULAR_EXPRESSION "Need 25 words"
                      LABELS "p2p")
 
-add_test(NAME kill_daemon_p2p COMMAND kill_daemon ${DAEMON_EXECUTABLE}.log)
+add_test(NAME kill_daemon_p2p
+  COMMAND kill_daemon ${CMAKE_CURRENT_BINARY_DIR}/${DAEMON_EXECUTABLE}.log)
 set_tests_properties(kill_daemon_p2p PROPERTIES
                      PASS_REGULAR_EXPRESSION "Killing PID"
                      FAIL_REGULAR_EXPRESSION "No such process|Cannot open file"
                      LABELS "p2p")
-add_test(NAME kill_daemon2_p2p COMMAND kill_daemon
-         ${DAEMON_EXECUTABLE}.27091.log)
+add_test(NAME kill_daemon2_p2p
+  COMMAND kill_daemon ${CMAKE_CURRENT_BINARY_DIR}/${DAEMON_EXECUTABLE}.27091.log)
 set_tests_properties(kill_daemon2_p2p PROPERTIES
                      PASS_REGULAR_EXPRESSION "Killing PID"
                      FAIL_REGULAR_EXPRESSION "No such process|Cannot open file"
                      LABELS "p2p")
 add_test(NAME kill_daemon3_p2p
-        COMMAND kill_daemon ${DAEMON_EXECUTABLE}.17091.log)
+  COMMAND kill_daemon ${CMAKE_CURRENT_BINARY_DIR}/${DAEMON_EXECUTABLE}.17091.log)
 set_tests_properties(kill_daemon3_p2p PROPERTIES
                      PASS_REGULAR_EXPRESSION "Killing PID"
                      FAIL_REGULAR_EXPRESSION "No such process|Cannot open file"
