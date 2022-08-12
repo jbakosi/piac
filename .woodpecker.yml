@@ -1,19 +1,29 @@
 matrix:
   include:
-    - BUILDTYPE: Debug
-      COMPILER: clang
     - BUILDTYPE: Release
       COMPILER: gnu
+    - BUILDTYPE: Debug
+      COMPILER: clang
 
 pipeline:
   build:
-    image: jbakosi/piac-${COMPILER}
+    image: jbakosi/piac-gnu
     #pull: true
     commands:
-     - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} ${CMAKE_COMPILER_FLAGS} -DTPL_DIR=/piac/external/install/${COMPILER}-x86_64 .. && make -sj$(grep -c processor /proc/cpuinfo)
+     - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DTPL_DIR=/piac/external/install/${COMPILER}-x86_64 .. && make -sj$(grep -c processor /proc/cpuinfo)
     when:
-      COMPILER: clang
-      CMAKE_COMPILER_FLAGS: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      matrix:
+        COMPILER: gnu
+
+  build-clang:
+    image: jbakosi/piac-clang
+    #pull: true
+    commands:
+     - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DTPL_DIR=/piac/external/install/${COMPILER}-x86_64 .. && make -sj$(grep -c processor /proc/cpuinfo)
+    when:
+      matrix:
+        COMPILER: clang
+
   test:
     image: jbakosi/piac-${COMPILER}
     commands:
