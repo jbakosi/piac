@@ -32,7 +32,7 @@ Join the discussion on [matrix](https://matrix.to/#/#neroshop:matrix.org).
 ## Build
 ```sh
 # Install system-wide prerequisites on Debian/Ubuntu Linux
-sudo apt-get install git cmake g++ pkg-config libssl-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev rapidjson-dev libreadline-dev libcrypto++-dev libssl-dev
+sudo apt-get install git cmake g++ clang pkg-config libssl-dev libunbound-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev rapidjson-dev libreadline-dev libcrypto++-dev libssl-dev
 # Clone piac
 git clone https://codeberg.org/piac/piac.git && cd piac
 # Build external libraries
@@ -42,7 +42,7 @@ mkdir build && cd build && cmake .. && make && cd -
 # Test piac (optional)
 cd build && ctest
 ```
-See [doc/build.md](doc/build.md) for other ways to build.
+See also [doc/build.md](doc/build.md).
 
 ## Run
 ```sh
@@ -53,10 +53,10 @@ cd piac/build
 cd piac/build
 ./piac-cli --help
 ```
-See [doc/secure-rpc.md](doc/secure-rpc.md) for other ways to run.
+See also [doc/secure-rpc.md](doc/secure-rpc.md).
 
 ## Pronounce
 [[ˈpijɒt͡s]](https://en.wiktionary.org/wiki/piac)
 
 ## License
-GPL v3.
+GPL v3. See [LICENSE](COPYING).
