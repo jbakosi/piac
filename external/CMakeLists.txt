@@ -59,7 +59,7 @@ ExternalProject_Add(
   monero
   PREFIX monero
   GIT_REPOSITORY https://github.com/monero-project/monero
-  GIT_TAG v0.17.3.2
+  GIT_TAG v0.18.1.0
   GIT_SHALLOW 1
   PATCH_COMMAND ${MONERO_PATCH_COMMAND}
   CMAKE_ARGS
@@ -77,13 +77,12 @@ ExternalProject_Add(
 
 # monero-cpp
 ExternalProject_Add(
-  monerocpp
-  PREFIX monerocpp
+  monero-cpp
+  PREFIX monero-cpp
   DEPENDS monero
   GIT_REPOSITORY https://github.com/monero-ecosystem/monero-cpp
-  GIT_TAG v0.7.1
+  GIT_TAG master
   GIT_SHALLOW 1
-  PATCH_COMMAND patch -p1 -t -i ${PIAC_CMAKE_PATH}/monero-cpp.patch
   CMAKE_ARGS
     -D CMAKE_C_COMPILER:PATH=${CMAKE_C_COMPILER}
     -D CMAKE_CXX_COMPILER:PATH=${CMAKE_CXX_COMPILER}

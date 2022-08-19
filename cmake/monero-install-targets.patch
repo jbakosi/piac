@@ -1,23 +1,22 @@
 diff --git a/contrib/epee/src/CMakeLists.txt b/contrib/epee/src/CMakeLists.txt
-index 15e7687..3b056e9 100644
+index 808b9f0..b0aeb40 100644
 --- a/contrib/epee/src/CMakeLists.txt
 +++ b/contrib/epee/src/CMakeLists.txt
-@@ -46,6 +46,69 @@ if (BUILD_GUI_DEPS)
+@@ -56,6 +56,67 @@ if (BUILD_GUI_DEPS)
      endif()
      install(TARGETS epee
          ARCHIVE DESTINATION ${lib_folder})
 +    install(FILES ../include/include_base_utils.h
 +                  ../include/misc_log_ex.h
 +                  ../include/misc_language.h
-+                  ../include/pragma_comp_defs.h
 +                  ../include/int-util.h
 +                  ../include/string_tools.h
++                  ../include/string_tools_lexical.h
 +                  ../include/file_io_utils.h
 +                  ../include/byte_slice.h
 +                  ../include/syncobj.h
 +                  ../include/reg_exp_definer.h
 +                  ../include/time_helper.h
-+                  ../include/to_nonconst_iterator.h
 +                  DESTINATION include/utils)
 +    install(FILES ../include/net/http_client.h
 +                  ../include/net/http_client_base.h
@@ -62,8 +61,7 @@ index 15e7687..3b056e9 100644
 +                  ../include/span.h
 +                  ../include/mlocker.h
 +                  DESTINATION include/crypto)
-+    install(FILES ../include/serialization/enableable.h
-+                  ../include/serialization/keyvalue_serialization_overloads.h
++    install(FILES ../include/serialization/keyvalue_serialization_overloads.h
 +                  ../include/serialization/keyvalue_serialization.h
 +                  DESTINATION include/serialization)
 +    install(FILES ../../../external/easylogging++/easylogging++.h
@@ -73,29 +71,29 @@ index 15e7687..3b056e9 100644
        install(TARGETS epee_readline
            ARCHIVE DESTINATION ${lib_folder})
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 07d4d58..a323de1 100644
+index 3335d3c..efb87bc 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -143,3 +143,5 @@ endif()
+@@ -123,3 +123,5 @@ endif()
  
  add_subdirectory(device)
  add_subdirectory(device_trezor)
 +
 +monero_install_headers(common cryptonote_config.h)
 diff --git a/src/checkpoints/CMakeLists.txt b/src/checkpoints/CMakeLists.txt
-index 46d6fed..2353a31 100644
+index 665441f..5083673 100644
 --- a/src/checkpoints/CMakeLists.txt
 +++ b/src/checkpoints/CMakeLists.txt
-@@ -62,3 +62,4 @@ target_link_libraries(checkpoints
+@@ -61,3 +61,4 @@ target_link_libraries(checkpoints
      ${Boost_THREAD_LIBRARY}
    PRIVATE
      ${EXTRA_LIBRARIES})
 +monero_install_headers(checkpoints checkpoints.h)
 diff --git a/src/common/CMakeLists.txt b/src/common/CMakeLists.txt
-index 8e427b6..55f1c1c 100644
+index b712ee6..28491e8 100644
 --- a/src/common/CMakeLists.txt
 +++ b/src/common/CMakeLists.txt
-@@ -111,5 +111,8 @@ target_link_libraries(common
+@@ -82,5 +82,8 @@ target_link_libraries(common
      ${OPENSSL_LIBRARIES}
      ${EXTRA_LIBRARIES})
  
@@ -105,10 +103,10 @@ index 8e427b6..55f1c1c 100644
  #monero_install_headers(common
  #  ${common_headers})
 diff --git a/src/crypto/CMakeLists.txt b/src/crypto/CMakeLists.txt
-index 3b33fe9..b420d28 100644
+index 595c7f9..7c77c79 100644
 --- a/src/crypto/CMakeLists.txt
 +++ b/src/crypto/CMakeLists.txt
-@@ -105,6 +105,8 @@ if (ARM)
+@@ -85,6 +85,8 @@ if (ARM)
    endif()
  endif()
  
@@ -118,10 +116,10 @@ index 3b33fe9..b420d28 100644
  # So this code runs with a 1 MB default stack size. 
  # This will force the use of the heap for the allocation of the scratchpad
 diff --git a/src/cryptonote_basic/CMakeLists.txt b/src/cryptonote_basic/CMakeLists.txt
-index e7db0d3..bd04859 100644
+index 1414be1..2ac70e2 100644
 --- a/src/cryptonote_basic/CMakeLists.txt
 +++ b/src/cryptonote_basic/CMakeLists.txt
-@@ -90,3 +90,12 @@ target_link_libraries(cryptonote_basic
+@@ -79,3 +79,12 @@ target_link_libraries(cryptonote_basic
      ${Boost_THREAD_LIBRARY}
    PRIVATE
      ${EXTRA_LIBRARIES})
@@ -135,17 +133,17 @@ index e7db0d3..bd04859 100644
 +  ../../external/boost/archive/portable_binary_oarchive.hpp
 +  ../../external/boost/archive/portable_binary_archive.hpp)
 diff --git a/src/cryptonote_core/CMakeLists.txt b/src/cryptonote_core/CMakeLists.txt
-index 0be8b54..853a5c3 100644
+index 69411e3..173325f 100644
 --- a/src/cryptonote_core/CMakeLists.txt
 +++ b/src/cryptonote_core/CMakeLists.txt
-@@ -67,3 +67,5 @@ target_link_libraries(cryptonote_core
+@@ -60,3 +60,5 @@ target_link_libraries(cryptonote_core
      ${Boost_THREAD_LIBRARY}
    PRIVATE
      ${EXTRA_LIBRARIES})
 +
 +monero_install_headers(cryptonote_core cryptonote_tx_utils.h)
 diff --git a/src/cryptonote_protocol/CMakeLists.txt b/src/cryptonote_protocol/CMakeLists.txt
-index 85c2554..5de4caa 100644
+index b516e17..46a0ae9 100644
 --- a/src/cryptonote_protocol/CMakeLists.txt
 +++ b/src/cryptonote_protocol/CMakeLists.txt
 @@ -39,3 +39,4 @@ target_link_libraries(cryptonote_protocol
@@ -154,7 +152,7 @@ index 85c2554..5de4caa 100644
      ${EXTRA_LIBRARIES})
 +monero_install_headers(cryptonote_protocol cryptonote_protocol_defs.h)
 diff --git a/src/device/CMakeLists.txt b/src/device/CMakeLists.txt
-index 3597ab3..b98f396 100644
+index e4f1159..4e55c98 100644
 --- a/src/device/CMakeLists.txt
 +++ b/src/device/CMakeLists.txt
 @@ -80,3 +80,5 @@ target_link_libraries(device
@@ -164,27 +162,27 @@ index 3597ab3..b98f396 100644
 +
 +monero_install_headers(device device.hpp)
 diff --git a/src/net/CMakeLists.txt b/src/net/CMakeLists.txt
-index afcd42e..dd5c99c 100644
+index a4d31ee..e064fa9 100644
 --- a/src/net/CMakeLists.txt
 +++ b/src/net/CMakeLists.txt
-@@ -33,4 +33,4 @@ set(net_headers dandelionpp.h error.h http.cpp i2p_address.h parse.h socks.h soc
+@@ -33,4 +33,4 @@ monero_find_all_headers(net_headers "${CMAKE_CURRENT_SOURCE_DIR}")
  
  monero_add_library(net ${net_sources} ${net_headers})
  target_link_libraries(net common epee ${ZMQ_LIB} ${Boost_ASIO_LIBRARY})
 -
 +monero_install_headers(net http.h)
 diff --git a/src/ringct/CMakeLists.txt b/src/ringct/CMakeLists.txt
-index 40b2dfd..8d8237c 100644
+index d415e64..2676499 100644
 --- a/src/ringct/CMakeLists.txt
 +++ b/src/ringct/CMakeLists.txt
-@@ -77,3 +77,5 @@ target_link_libraries(ringct
+@@ -74,3 +74,5 @@ target_link_libraries(ringct
    PRIVATE
      ${OPENSSL_LIBRARIES}
      ${EXTRA_LIBRARIES})
 +
 +monero_install_headers(ringct rctTypes.h rctOps.h rctCryptoOps.h)
 diff --git a/src/rpc/CMakeLists.txt b/src/rpc/CMakeLists.txt
-index 19298c9..90b98e9 100644
+index edfc700..094a902 100644
 --- a/src/rpc/CMakeLists.txt
 +++ b/src/rpc/CMakeLists.txt
 @@ -175,3 +175,4 @@ target_link_libraries(daemon_rpc_server
@@ -193,10 +191,10 @@ index 19298c9..90b98e9 100644
  target_include_directories(obj_daemon_rpc_server PUBLIC ${ZMQ_INCLUDE_PATH})
 +monero_install_headers(rpc core_rpc_server_commands_defs.h rpc_handler.h)
 diff --git a/src/serialization/CMakeLists.txt b/src/serialization/CMakeLists.txt
-index 34e274b..5ea96f0 100644
+index d3b9e57..d0f2fe0 100644
 --- a/src/serialization/CMakeLists.txt
 +++ b/src/serialization/CMakeLists.txt
-@@ -54,3 +54,6 @@ target_link_libraries(serialization
+@@ -53,3 +53,6 @@ target_link_libraries(serialization
  add_dependencies(serialization
    version)
  
@@ -204,7 +202,7 @@ index 34e274b..5ea96f0 100644
 +  variant.h serialization.h containers.h container.h binary_archive.h
 +  json_archive.h debug_archive.h crypto.h string.h pair.h)
 diff --git a/src/serialization/serialization.h b/src/serialization/serialization.h
-index 3ebeed1..bff259c 100644
+index 381d29c..68da86b 100644
 --- a/src/serialization/serialization.h
 +++ b/src/serialization/serialization.h
 @@ -41,6 +41,7 @@
@@ -216,15 +214,15 @@ index 3ebeed1..bff259c 100644
  #include <list>
  #include <set>
 diff --git a/src/wallet/CMakeLists.txt b/src/wallet/CMakeLists.txt
-index bf238ae..09ab64a 100644
+index 6095f99..bfaa089 100644
 --- a/src/wallet/CMakeLists.txt
 +++ b/src/wallet/CMakeLists.txt
-@@ -154,6 +154,8 @@ if (BUILD_GUI_DEPS)
-     file(WRITE "trezor_link_flags.txt" ${TREZOR_DEP_LINKER})
-     install(FILES "trezor_link_flags.txt"
-             DESTINATION ${lib_folder})
-+    monero_install_headers(wallet wallet2.h wallet_errors.h node_rpc_proxy.h
-+      wallet_rpc_helpers.h message_store.h message_transporter.h wallet_light_rpc.h)
+@@ -102,6 +102,8 @@ if(NOT IOS)
+     PROPERTY
+       OUTPUT_NAME "monero-wallet-rpc")
+   install(TARGETS wallet_rpc_server DESTINATION bin)
++  monero_install_headers(wallet wallet2.h wallet_errors.h node_rpc_proxy.h
++    wallet_rpc_helpers.h message_store.h message_transporter.h wallet_light_rpc.h)
  endif()
  
  add_subdirectory(api)
