@@ -18,7 +18,7 @@ really only useful if the client and server are running on the same physical
 machine, since messages are sent via clear text. Stonehouse or ironhouse should
 be used if the client and server communicate accross the network.
 
-## Runnging client/server in _grasslands_ (no-security) mode
+## Running client/server in _grasslands_ (no-security) mode
 
 This is the simplest, neither the server nor the client require any extra
 command line arguments:
@@ -30,7 +30,7 @@ $ ./piac-cli
 You either run the daemon in the background using `--detach`, or run it in its
 own terminal.
 
-## Runnging client/server in _stonehouse_ (encrypted) mode
+## Running client/server in _stonehouse_ (encrypted) mode
 
 This sets up an encrypted channel between server and client and the server only
 allows clients that have the server's public key. Only encrypted connections
