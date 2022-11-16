@@ -105,7 +105,7 @@ There are two main channels of communication:
    |           |                               |           |
    | DAEMON  <------------------------------------         |
    |__________ | ROUTER                DEALER  |___________|
-                 (bund)               (connect)
+                 (bind)               (connect)
 ```
 
 Multiple daemons and clients can run on a single computer and the communication
