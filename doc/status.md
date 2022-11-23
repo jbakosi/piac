@@ -33,13 +33,24 @@ Here is a todo list in no particular order:
 - [x] encrypt socket between cli and daemon, ironhouse
 - [x] build/test with clang
 - [x] add `-Wall` to build system
-- [ ] add valgrind tests
 - [x] set up generation of code coverage (gcov, cppcheck)
+- [ ] add valgrind tests
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
 - [ ] encrypt db at rest
 - [ ] add images to ads in db
 - [ ] purge ad after completion
-- [ ] allow connecting to I2P via i2pd
+- [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
+- [ ] add p2p traffic encryption and authentication
+- [ ] add messaging between users via matrix (libkazv)
+- [ ] allow running and connecting to own monero node
+- [ ] allow connecting to remote monero node
+- [ ] allow user to see balance
+- [ ] allow user to buy something
+- [ ] allow user to track order status
+- [ ] allow user to create whishlist
+- [ ] explore escrow
+- [ ] explore/add reputation (automatic after successful buy/sell and/or by other users)
+- [ ] explore product rating
 - [ ] add detailed contributing.md
 - [ ] describe trust model
 - [ ] write privacy policy
