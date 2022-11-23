@@ -38,6 +38,11 @@
   exit( EXIT_SUCCESS );
 }
 
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
+
 static void s_catch_signals() {
   struct sigaction action;
   action.sa_handler = s_signal_handler;
@@ -47,6 +52,11 @@ static void s_catch_signals() {
   sigaction( SIGTERM, &action, nullptr );
 }
 
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
+#include <zmqpp/curve.hpp>
 namespace piac {
 
 static std::mutex g_hashes_mtx;
