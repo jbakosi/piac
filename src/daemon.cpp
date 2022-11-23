@@ -33,9 +33,7 @@
 #include "logging_util.hpp"
 #include "db.hpp"
 
-static volatile int g_interrupted = 0;
-static void s_signal_handler( int /*signal_value*/ ) {
-  g_interrupted = 1;
+[[noreturn]] static void s_signal_handler( int /*signal_value*/ ) {
   MDEBUG( "interrupted" );
   exit( EXIT_SUCCESS );
 }
@@ -45,8 +43,8 @@ static void s_catch_signals() {
   action.sa_handler = s_signal_handler;
   action.sa_flags = 0;
   sigemptyset( &action.sa_mask );
-  sigaction( SIGINT, &action, NULL );
-  sigaction( SIGTERM, &action, NULL );
+  sigaction( SIGINT, &action, nullptr );
+  sigaction( SIGTERM, &action, nullptr );
 }
 
 namespace piac {
