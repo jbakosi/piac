@@ -34,11 +34,10 @@ Here is a todo list in no particular order:
 - [x] build/test with clang
 - [x] add `-Wall` to build system
 - [x] set up generation of code coverage (gcov, cppcheck)
-- [ ] add valgrind tests
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
-- [ ] encrypt db at rest
 - [ ] add images to ads in db
-- [ ] purge ad after completion
+- [ ] purge ad after completion of purchase
+- [ ] add ad authentication
 - [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
 - [ ] add p2p traffic encryption and authentication
 - [ ] add messaging between users via matrix (libkazv)
@@ -51,6 +50,8 @@ Here is a todo list in no particular order:
 - [ ] explore escrow
 - [ ] explore/add reputation (automatic after successful buy/sell and/or by other users)
 - [ ] explore product rating
+- [ ] explore encrypting db at rest
+- [ ] add valgrind tests
 - [ ] add detailed contributing.md
 - [ ] describe trust model
 - [ ] write privacy policy
