@@ -704,15 +704,15 @@ usage( const std::string& db_name,
   return "Usage: " + piac::daemon_executable() + " [OPTIONS]\n\n"
           "OPTIONS\n"
           "  --db <directory>\n"
-          "         Use database, default: " + db_name + "\n\n"
+          "         Use database, default: " + db_name + ".\n\n"
           "  --detach\n"
-          "         Run as a daemon in the background\n\n"
+          "         Run as a daemon in the background.\n\n"
           "  --help\n"
-          "         Show help message\n\n"
+          "         Show help message.\n\n"
           "  --log-file <filename.log>\n"
-          "         Specify log filename, default: " + logfile + "\n\n"
+          "         Specify log filename, default: " + logfile + ".\n\n"
           "  --log-level <[0-4]>\n"
-          "         Specify log level: 0: minimum, 4: maximum\n\n"
+          "         Specify log level: 0: minimum, 4: maximum.\n\n"
           "  --max-log-file-size <size-in-bytes> \n"
           "         Specify maximum log file size in bytes. Default: " +
           std::to_string( MAX_LOG_FILE_SIZE ) + ". Once the log file\n"
@@ -728,10 +728,10 @@ usage( const std::string& db_name,
                    "probably prefer to use\n"
           "         established solutions like logrotate instead.\n\n"
           "  --peer <hostname>[:port]\n"
-          "         Specify a peer to connect to\n\n"
+          "         Specify a peer to connect to.\n\n"
           "  --rpc-bind-port <port>\n"
           "         Listen on RPC port given, default: "
-                  + std::to_string( rpc_port ) + "\n\n"
+                  + std::to_string( rpc_port ) + ".\n\n"
           "  --rpc-secure\n"
           "         Enable secure connection to clients.\n\n"
           "  --rpc-server-public-key-file <filename>\n"
@@ -750,9 +750,9 @@ usage( const std::string& db_name,
           "         also set --rpc-secure.\n\n"
           "  --p2p-bind-port <port>\n"
           "         Listen on P2P port given, default: "
-                  + std::to_string( p2p_port ) + "\n\n"
+                  + std::to_string( p2p_port ) + ".\n\n"
           "  --version\n"
-          "         Show version information\n\n";
+          "         Show version information.\n\n";
 }
 
 } // piac::
