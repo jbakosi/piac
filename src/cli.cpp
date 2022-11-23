@@ -72,11 +72,8 @@
   #pragma GCC diagnostic ignored "-Wreorder"
 #endif
 
-#define MONERO
-#ifdef MONERO
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include "wallet/monero_wallet_full.h"
-#endif
 
 #if defined(__clang__)
   #pragma clang diagnostic pop
@@ -173,16 +170,12 @@ send_cmd( std::string cmd,
           zmqpp::context& ctx,
           const std::string& host,
           const std::string& rpc_server_public_key,
-          const zmqpp::curve::keypair& client_keys
-          #ifdef MONERO
-             , const std::unique_ptr< monero_wallet_full >& wallet
-          #endif
-)
+          const zmqpp::curve::keypair& client_keys,
+          const std::unique_ptr< monero_wallet_full >& wallet )
 {
   piac::trim( cmd );
   MDEBUG( cmd );
 
-  #ifdef MONERO
   // append author if cmd contains "db add/rm"
   auto npos = std::string::npos;
   if ( cmd.find("db") != npos &&
@@ -195,7 +188,6 @@ send_cmd( std::string cmd,
     }
     cmd += " AUTH:" + piac::sha256( wallet->get_primary_address() );
   }
-  #endif
 
   // send message to daemon with command
   auto reply = pirate_send( cmd, ctx, host, rpc_server_public_key, client_keys );
@@ -216,13 +208,13 @@ color_string( const std::string &s, COLOR color = GRAY ) {
   return ret + s + "\033[0m";
 }
 
-#ifdef MONERO
 // *****************************************************************************
 [[nodiscard]] static std::unique_ptr< monero_wallet_full >
 create_wallet() {
   MDEBUG( "new" );
-  auto w = monero_wallet_full::create_wallet_random( "", "",
-             monero_network_type::TESTNET );
+  monero::monero_wallet_config wallet_config;
+  wallet_config.m_network_type = monero_network_type::STAGENET;
+  auto w = monero_wallet_full::create_wallet( wallet_config );
   std::cout << "Mnemonic seed: " << w->get_mnemonic() << '\n' <<
     "This is your monero wallet mnemonic seed that identifies you within\n"
     "piac. You can use it to create your ads or pay for a product. This seed\n"
@@ -253,8 +245,10 @@ show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
 switch_user( const std::string& mnemonic ) {
   MDEBUG( "user" );
   assert( not mnemonic.empty() );
-  auto w = monero_wallet_full::create_wallet_from_mnemonic( "", "",
-             monero_network_type::TESTNET, mnemonic );
+  monero::monero_wallet_config wallet_config;
+  wallet_config.m_mnemonic = mnemonic;
+  wallet_config.m_network_type = monero_network_type::TESTNET;
+  auto w = monero_wallet_full::create_wallet( wallet_config );
   std::cout << "Switched to new user\n";
   return std::unique_ptr< monero_wallet_full >( w );
 }
@@ -269,7 +263,6 @@ show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
   }
   std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
 }
-#endif
 
 // ****************************************************************************
 [[nodiscard]] static int
@@ -530,10 +523,8 @@ int main( int argc, char **argv ) {
   std::cout << "Will send commands to daemon at " << host << ".\n";
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
-  #ifdef MONERO
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
-  #endif
 
   MLOG_SET_THREAD_NAME( "cli" );
 
@@ -612,12 +603,8 @@ int main( int argc, char **argv ) {
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
-      #ifdef MONERO
       piac::send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys,
                       wallet );
-      #else
-      piac::send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys );
-      #endif
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
@@ -676,29 +663,19 @@ int main( int argc, char **argv ) {
 
     } else if (!strcmp(buf,"keys")) {
 
-      #ifdef MONERO
       piac::show_wallet_keys( wallet );
-      #endif
 
     } else if (!strcmp(buf,"new")) {
 
-      #ifdef MONERO
       wallet = piac::create_wallet();
-      #endif
 
     } else if (!strcmp(buf,"peers")) {
 
-      #ifdef MONERO
       piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
                       rpc_client_keys, wallet );
-      #else
-      piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
-                      rpc_client_keys );
-      #endif
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
 
-      #ifdef MONERO
       std::string mnemonic( buf );
       mnemonic.erase( 0, 5 );
       if (mnemonic.empty()) {
@@ -708,7 +685,6 @@ int main( int argc, char **argv ) {
       } else {
         wallet = piac::switch_user( mnemonic );
       }
-      #endif
 
     } else if (!strcmp(buf,"version")) {
 
