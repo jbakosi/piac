@@ -115,3 +115,18 @@ ExternalProject_Add(
   LOG_CONFIGURE 1
   LOG_BUILD 1
 )
+
+# mcss
+ExternalProject_Add(
+  mcss
+  PREFIX mcss
+  GIT_REPOSITORY https://github.com/mosra/m.css
+  GIT_TAG 91ff035
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory
+                  ${PROJECT_BINARY_DIR}/mcss/src/mcss
+                  ${CMAKE_INSTALL_PREFIX}/m.css
+  LOG_DOWNLOAD 1
+  LOG_INSTALL 1
+)

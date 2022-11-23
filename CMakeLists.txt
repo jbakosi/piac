@@ -95,6 +95,8 @@ if (NOT TPL_DIR)
       STRING "Third-party (external) libraries install directory.")
 endif()
 message(STATUS "Third-party (external) libraries install directory: " ${TPL_DIR})
+# Add our TPL_DIR to modules directory
+set(CMAKE_PREFIX_PATH ${TPL_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find monero
 find_library(MONEROCPP_LIBRARIES libmonero-cpp.so ${TPL_DIR}/lib)
@@ -129,7 +131,21 @@ find_package(cryptopp REQUIRED)
 # Find OpenSSL
 find_package(OpenSSL REQUIRED)
 
+# Find Python: required for code coverage (fastcov) and doc (m.css)
+find_package(PythonInterp 3.6)
+
+# Attempt to find tools required for code coverage analysis
+include(DetectCodeCoverage)
+
+# Set compiler flags to perform code coverage analysis
+if(CODE_COVERAGE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage ")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+endif()
+
 #### piac
+
+set(EXECUTABLES)
 
 add_library(db ${PIAC_SOURCE_DIR}/db.cpp)
 target_include_directories(db PUBLIC ${PIAC_SOURCE_DIR}
@@ -209,6 +225,7 @@ install(TARGETS ${DAEMON_EXECUTABLE}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 message(STATUS "Target ${DAEMON_EXECUTABLE} configured")
+list(APPEND EXECUTABLES ${DAEMON_EXECUTABLE})
 
 # configure piac cli executable
 set(CLI_EXECUTABLE "piac-cli")
@@ -240,6 +257,7 @@ install(TARGETS ${CLI_EXECUTABLE}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 message(STATUS "Target ${CLI_EXECUTABLE} configured")
+list(APPEND EXECUTABLES ${CLI_EXECUTABLE})
 
 #### Testing
 
@@ -249,11 +267,16 @@ if (NOT ENABLE_TESTS)
 else()
   enable_testing()
   add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+  list(APPEND EXECUTABLES kill_daemon rnd_json_entry pirate_server)
 endif()
 
 # Grab current date to stick into the executables
 execute_process(COMMAND "date" "--utc" OUTPUT_VARIABLE BUILD_DATE)
 string(REGEX REPLACE "[\r\n]" "" BUILD_DATE "${BUILD_DATE}")
+
+execute_process(COMMAND "date" "+%A, %b %d, %Y"
+                OUTPUT_VARIABLE BUILD_DATE_SIMPLE)
+string(REGEX REPLACE "[\r\n]" "" BUILD_DATE_SIMPLE "${BUILD_DATE_SIMPLE}")
 
 # Configure cmake variables to pass to the build
 configure_file( "${PIAC_SOURCE_DIR}/project_config.hpp.in"
@@ -263,5 +286,69 @@ configure_file( "${PIAC_SOURCE_DIR}/project_config.cpp.in"
 
 # configure zmq curve certificate generator executable
 add_executable(curve_keygen ${PIAC_SOURCE_DIR}/curve_keygen.cpp)
+list(APPEND EXECUTABLES curve_keygen)
 target_include_directories(curve_keygen PUBLIC ${ZMQPP_INCLUDE_DIRS})
 target_link_libraries(curve_keygen PRIVATE ${ZMQPP_LIBRARIES})
+
+# Configure building documentation and web page
+find_package(Doxygen 1.8.15)
+find_package(MCSS)
+if (DOXYGEN_FOUND AND MCSS_FOUND AND PYTHONINTERP_FOUND AND PYGMENTS_FOUND AND
+    JINJA2_FOUND)
+
+  find_program( PERL perl )
+  find_program( AWK awk )
+  find_program( XARGS xargs )
+  find_program( HEAD head )
+
+  if (PERL AND AWK AND XARGS AND HEAD)
+
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doc/piac.doxy
+                   ${CMAKE_CURRENT_BINARY_DIR}/doc/piac.doxy @ONLY)
+
+    file(GLOB doc_pages CONFIGURE_DEPENDS
+         RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "doc/pages/*.dox")
+    foreach(page ${doc_pages})
+      configure_file(${page} ${CMAKE_CURRENT_BINARY_DIR}/${page} @ONLY)
+    endforeach()
+
+    file(COPY doc/images DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/doc/html)
+
+    add_custom_command(OUTPUT xml
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
+                       DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/piac.doxy
+                       COMMAND ${DOXYGEN_EXECUTABLE} piac.doxy
+                       COMMAND ${MCSS_DOX2HTML5} --no-doxygen piac.doxy
+                       VERBATIM USES_TERMINAL)
+
+    add_custom_target(doc DEPENDS xml
+                      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
+                      COMMENT "Documentation")
+
+    message(STATUS "Add target 'doc' to generate documentation to ./doc/html/index.html")
+
+  endif()
+
+endif()
+
+# Setup code coverage targets
+if(CODE_COVERAGE)
+
+  # Determine number of CPUs available
+  if (DEFINED ENV{SLURM_NPROCS})
+    set(PROCESSOR_COUNT $ENV{SLURM_NPROCS})
+  else()
+    include(ProcessorCount)
+    ProcessorCount(PROCESSOR_COUNT)
+    if(PROCESSOR_COUNT EQUAL 0)     # if ncpus could not be determined, assign 1
+      set(PROCESSOR_COUNT "1")
+    endif()
+  endif()
+  message(STATUS "Found ${PROCESSOR_COUNT} PEs")
+
+  include(CppCheck)
+  include(CodeCoverage)
+  setup_target_for_coverage(doc/html/${CMAKE_BUILD_TYPE} test_coverage
+                            DEPENDS ${EXECUTABLES})
+
+endif()

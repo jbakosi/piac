@@ -34,7 +34,7 @@ Here is a todo list in no particular order:
 - [x] build/test with clang
 - [x] add `-Wall` to build system
 - [ ] add valgrind tests
-- [ ] set up automatic generation of code coverage
+- [x] set up generation of code coverage (gcov, cppcheck)
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
 - [ ] encrypt db at rest
 - [ ] add images to ads in db

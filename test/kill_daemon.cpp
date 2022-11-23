@@ -28,7 +28,7 @@ int main( int argc, char** argv )
 
   // Kill PID
   std::cout << "Killing PID: " << pid << std::endl;
-  auto ret = kill( pid, SIGKILL );
+  auto ret = kill( pid, SIGTERM );
   if (ret == -1) {
     perror("kill");
     return EXIT_FAILURE;

@@ -1,0 +1,14 @@
+/*!
+@mainpage Piac
+
+@m_div{m-col-m-2 m-right-m}
+<img src="images/Eo_circle_blue-grey_letter-p.svg"/>
+@m_enddiv
+
+_Buy and sell anything privately and securely_
+
+The goal of this project is to develop a decentralized peer-to-peer marketplace where sellers and buyers can transact privately and securely preserving as much anonymity as practically possible.
+
+See https://codeberg.org/piac/piac for more details.
+
+*/

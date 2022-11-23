@@ -323,7 +323,6 @@ piac::db_list_doc( const std::string& db_name ) {
 // *****************************************************************************
 std::size_t
 piac::db_list_numuser( const std::string& db_name ) {
-  std::string stat;
   try {
 
     Xapian::Database db( db_name );
