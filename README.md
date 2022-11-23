@@ -9,7 +9,7 @@ The goal of this project is to develop a decentralized peer-to-peer marketplace 
 This project is work-in-progress. See the current status and todo list in [doc/status.md](doc/status.md).
 
 ## Contribute
-Join the discussion on [matrix](https://matrix.to/#/#neroshop:matrix.org).
+Join the discussion on [matrix](https://matrix.to/#/!GQOnNHAlHPcDKkYheV:matrix.org?via=matrix.org).
 
 ## Planned features
 * Buy and sell with [monero](https://getmonero.org)
