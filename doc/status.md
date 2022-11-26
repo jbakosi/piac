@@ -34,18 +34,19 @@ Here is a todo list in no particular order:
 - [x] build/test with clang
 - [x] add `-Wall` to build system
 - [x] set up generation of code coverage (gcov, cppcheck)
-- [ ] implement more sophisticated p2p commmunication based on white/gray lists
+- [ ] refactor + add doxygen docs
 - [ ] add images to ads in db
 - [ ] purge ad after completion of purchase
 - [ ] add ad authentication (WIP)
 - [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
 - [ ] add p2p traffic encryption and authentication
+- [ ] implement more sophisticated p2p commmunication based on white/gray lists
 - [ ] allow user to save other users in addressbook (matrixuser + monero address)
 - [ ] add messaging between users via matrix (libkazv)
-- [x] allow connecting to own monero node
+- [x] allow connecting to local monero node
 - [ ] allow connecting to remote monero node (WIP)
-- [ ] allow running own monero node
-- [ ] allow user to see balance
+- [ ] allow running local monero node
+- [x] allow user to see balance (sync wallet in background)
 - [ ] allow user to buy something
 - [ ] allow user to track order status
 - [ ] allow user to create whishlist
@@ -59,5 +60,5 @@ Here is a todo list in no particular order:
 - [ ] write privacy policy
 - [ ] describe how to handle disputes
 - [ ] GUI: bright/dark theme, limits on entries, add ad all in one page
-- [ ] price in XMR (optionally show in user-configured currency)
+- [ ] display ad price in XMR (optionally in user-configured currency)
 - [ ] explore anonymous shipping address options
