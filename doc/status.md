@@ -37,12 +37,14 @@ Here is a todo list in no particular order:
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
 - [ ] add images to ads in db
 - [ ] purge ad after completion of purchase
-- [ ] add ad authentication
+- [ ] add ad authentication (WIP)
 - [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
 - [ ] add p2p traffic encryption and authentication
+- [ ] allow user to save other users in addressbook (matrixuser + monero address)
 - [ ] add messaging between users via matrix (libkazv)
-- [ ] allow running and connecting to own monero node
-- [ ] allow connecting to remote monero node
+- [x] allow connecting to own monero node
+- [ ] allow connecting to remote monero node (WIP)
+- [ ] allow running own monero node
 - [ ] allow user to see balance
 - [ ] allow user to buy something
 - [ ] allow user to track order status

@@ -86,7 +86,7 @@ set_tests_properties(daemon2_zmq_grep PROPERTIES
                      DEPENDS wait4comm_zmq LABELS "zmq")
 add_test(NAME daemon3_zmq_grep COMMAND ${GREP} "Number of peers: 2"
          ${CMAKE_CURRENT_BINARY_DIR}/${DAEMON_EXECUTABLE}.37091.log)
-set_tests_properties(daemon2_zmq_grep PROPERTIES
+set_tests_properties(daemon3_zmq_grep PROPERTIES
                      DEPENDS wait4comm_zmq LABELS "zmq")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55091" _in)

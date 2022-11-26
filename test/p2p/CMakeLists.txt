@@ -82,7 +82,7 @@ file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.user" _in)
 add_test(NAME cli_user_p2p
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_user_p2p PROPERTIES
-                     PASS_REGULAR_EXPRESSION "Primary address: 9v1yTe3u4ox9ew2nJHrCf4SBhr4xkLXyJa3LDsWoLPNX2fWQ6dpr3HBhUqFaoYA8T48Fh52qZdHzV8hUaFMs7Jtx6tAPTPy"
+                     PASS_REGULAR_EXPRESSION "Primary address: 54gU4EJbS3x9ew2nJHrCf4SBhr4xkLXyJa3LDsWoLPNX2fWQ6dpr3HBhUqFaoYA8T48Fh52qZdHzV8hUaFMs7Jtx6yY9Fng"
                      LABELS "p2p")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.nouser" _in)
