@@ -208,20 +208,67 @@ color_string( const std::string &s, COLOR color = GRAY ) {
   return ret + s + "\033[0m";
 }
 
+// wallet sync listener class
+class WalletListener : public monero::monero_wallet_listener {
+  public:
+    WalletListener() : m_height( 0 ), m_start_height( 0 ), m_end_height( 0 ),
+      m_percent_done( 0.0 ), m_message() {}
+    void on_sync_progress( uint64_t height, uint64_t start_height,
+                           uint64_t end_height, double percent_done,
+                           const std::string& message ) override
+    {
+      m_height = height;
+      m_start_height = start_height;
+      m_end_height = end_height;
+      m_percent_done = percent_done;
+      m_message = message;
+    }
+    virtual ~WalletListener() = default;
+    uint64_t height() const { return m_height; }
+    uint64_t start_height() const { return m_start_height; }
+    uint64_t end_height() const { return m_end_height; }
+    double percent_done() const { return m_percent_done; }
+    std::string message() const { return m_message; }
+  private:
+    uint64_t m_height;
+    uint64_t m_start_height;
+    uint64_t m_end_height;
+    double m_percent_done;
+    std::string m_message;
+};
+
+// *****************************************************************************
+static void
+start_syncing( const std::string& msg,
+               monero_wallet_full* wallet,
+               WalletListener& listener )
+{
+  std::cout << msg;
+  if (wallet->is_connected_to_daemon()) {
+    std::cout << ", starting background sync, check progress with 'balance'\n";
+    wallet->add_listener( listener );
+    wallet->start_syncing( /* sync period in ms = */ 10000 );
+  } else {
+    std::cout << ", no connection to monero daemon, see 'monerod'\n";
+  }
+}
+
 // *****************************************************************************
 [[nodiscard]] static std::unique_ptr< monero_wallet_full >
-create_wallet() {
+create_wallet( const std::string& monerod_host, WalletListener& listener ) {
   MDEBUG( "new" );
   monero::monero_wallet_config wallet_config;
   wallet_config.m_network_type = monero_network_type::STAGENET;
-  auto w = monero_wallet_full::create_wallet( wallet_config );
-  std::cout << "Mnemonic seed: " << w->get_mnemonic() << '\n' <<
+  wallet_config.m_server_uri = monerod_host;
+  auto wallet = monero_wallet_full::create_wallet( wallet_config );
+  start_syncing( "Created new user/wallet", wallet, listener );
+  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n' <<
     "This is your monero wallet mnemonic seed that identifies you within\n"
     "piac. You can use it to create your ads or pay for a product. This seed\n"
     "can be restored within your favorite monero wallet software and you can\n"
     "use this wallet just like any other monero wallet. Save this seed and\n"
     "keep it secret.\n";
-  return std::unique_ptr< monero_wallet_full >( w );
+  return std::unique_ptr< monero_wallet_full >( wallet );
 }
 
 // *****************************************************************************
@@ -241,16 +288,41 @@ show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
 }
 
 // *****************************************************************************
-[[nodiscard]] static std::unique_ptr< monero_wallet_full >
-switch_user( const std::string& mnemonic ) {
+static void
+show_wallet_balance( const std::unique_ptr< monero_wallet_full >& wallet,
+                     const WalletListener& listener )
+{
+  MDEBUG( "balance" );
+  if (not wallet) {
+    std::cout << "Need active user id (wallet). See 'new' or 'user'.\n";
+    return;
+  }
+  std::cout << "Balance = " << std::fixed << std::setprecision( 6 )
+            << static_cast< double >( wallet->get_balance() ) / 1.0e+12
+            << " XMR\n";
+  std::cout << "Wallet sync start height: " << listener.start_height() << '\n';
+  std::cout << "Wallet sync height: " << listener.height() << '\n';
+  std::cout << "Wallet sync end height: " << listener.end_height() << '\n';
+  std::cout << "Wallet sync at: " << std::fixed << std::setprecision( 2 )
+            << listener.percent_done() * 100.0 << "%\n";
+}
+
+// *****************************************************************************
+[[nodiscard]] static
+std::unique_ptr< monero_wallet_full >
+switch_user( const std::string& mnemonic,
+             const std::string& monerod_host,
+             WalletListener& listener )
+{
   MDEBUG( "user" );
   assert( not mnemonic.empty() );
   monero::monero_wallet_config wallet_config;
   wallet_config.m_mnemonic = mnemonic;
-  wallet_config.m_network_type = monero_network_type::TESTNET;
-  auto w = monero_wallet_full::create_wallet( wallet_config );
-  std::cout << "Switched to new user\n";
-  return std::unique_ptr< monero_wallet_full >( w );
+  wallet_config.m_network_type = monero_network_type::STAGENET;
+  wallet_config.m_server_uri = monerod_host;
+  auto wallet = monero_wallet_full::create_wallet( wallet_config );
+  start_syncing( "Switched to new user/wallet", wallet, listener );
+  return std::unique_ptr< monero_wallet_full >( wallet );
 }
 
 // *****************************************************************************
@@ -520,11 +592,17 @@ int main( int argc, char **argv ) {
 
   std::string host = "localhost:55090";
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << "Will send commands to daemon at " << host << ".\n";
+  std::cout << "Will connect to piac daemon at " << host << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
+
+  std::string monerod_host = "localhost:38089";
+  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
+  std::cout << "Wallet connecting to monero daemon at " << monerod_host << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
+  piac::WalletListener listener;
 
   MLOG_SET_THREAD_NAME( "cli" );
 
@@ -550,13 +628,13 @@ int main( int argc, char **argv ) {
   if (rpc_secure) {
     if (rpc_ironhouse) {  // ironhouse
       epee::set_console_color( epee::console_color_green, /*bright=*/ false );
-      std::string ironhouse( "Connection to server is secure and "
+      std::string ironhouse( "Connection to piac daemon is secure and "
         "authenticated." );
       std::cout << ironhouse << '\n';
       epee::set_console_color( epee::console_color_white, /*bright=*/false );
       MINFO( ironhouse );
     } else {              // stonehouse
-      std::string stonehouse( "Connection to server is secure but not "
+      std::string stonehouse( "Connection to piac daemon is secure but not "
         "authenticated." );
       epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
       std::cout << stonehouse << '\n';
@@ -565,7 +643,7 @@ int main( int argc, char **argv ) {
     }
   } else {                // grasslands
     epee::set_console_color( epee::console_color_red, /* bright = */ false );
-    std::string grasslands( "WARNING: Connection to server is not secure" );
+    std::string grasslands( "WARNING: Connection to piac daemon is not secure" );
     std::cout << grasslands << '\n';
     MWARNING( grasslands );
   }
@@ -581,25 +659,9 @@ int main( int argc, char **argv ) {
 
   while ((buf = readline( prompt.c_str() ) ) != nullptr) {
 
-    if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
-        buf[4]=='e' && buf[5]=='r')
-    {
+    if (!strcmp(buf,"balance")) {
 
-      std::string b( buf );
-      auto t = piac::tokenize( b );
-      if (t.size() > 1) {
-        host = t[1];
-        epee::set_console_color( epee::console_color_yellow,
-                                 /* bright = */ false );
-        std::cout << "Will send commands to daemon at " << host;
-        if (t.size() > 2) {
-          std::cout << ", using public key: " << t[2];
-          rpc_server_public_key = t[2];
-        }
-        std::cout << '\n';
-        epee::set_console_color( epee::console_color_default,
-                                 /*bright= */false );
-      }
+      piac::show_wallet_balance( wallet, listener );
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
@@ -608,71 +670,120 @@ int main( int argc, char **argv ) {
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
-      free( buf );
+      wallet.release();
       break;
 
     } else if (!strcmp(buf,"help")) {
 
       std::cout << "COMMANDS\n"
-
-        "      server <host>[:<port>] [<public-key>]\n"
-        "                Specify server to send commands to. The <host> "
-                        "argument specifies\n"
-        "                a hostname or an IPv4 address in standard dot "
-                         "notation.\n"
-        "                The optional <port> argument is an integer "
-                        "specifying a port. The\n"
-        "                default is " + host + ". The optional public-key is "
-                        "the server's\n"
-        "                public key to use for authenticated and secure "
-                        "connections.\n\n"
-        "      db <command>\n"
-        "                Send database command to daemon. Example db commands:\n"
-        "                > db query cat - search for the word 'cat'\n"
-        "                > db query race -condition - search for 'race' but "
-                        "not 'condition'\n"
-        "                > db add json <path-to-json-db-entry>\n"
-        "                > db rm <hash> - remove document\n"
-        "                > db list - list all documents\n"
-        "                > db list hash - list all document hashes\n"
-        "                > db list numdoc - list number of documents\n"
-        "                > db list numusr - list number of users in db\n\n"
-        "      exit, quit, q\n"
-        "                Exit\n\n"
-        "      help\n"
-        "                This help message\n\n"
-        "      keys\n"
-        "                Show monero wallet keys of current user\n\n"
-        "      new\n"
-        "                Create new user identity. This will generate a new "
-                        "monero wallet\n"
-        "                which will be used as a user id when creating an ad "
-                        "or paying for\n"
-        "                an item. This wallet can be used just like any other "
-                        "monero wallet.\n"
-        "                If you want to use your existing monero wallet, see "
-                        "'user'.\n\n"
-        "      peers\n"
-        "                List server peers\n\n"
-        "      user [<mnemonic>]\n"
-	"                Show active monero wallet mnemonic seed (user id) if "
-                        "no mnemonic is\n"
-        "                given. Switch to mnemonic if given.\n\n"
-        "      version\n"
-	"                Display " + piac::cli_executable() + " version\n";
+      "      balance\n"
+      "                Show monero wallet balance and sync status\n\n"
+      "      db <command>\n"
+      "                Send database command to piac daemon. Example db commands:\n"
+      "                > db query cat - search for the word 'cat'\n"
+      "                > db query race -condition - search for 'race' but not 'condition'\n"
+      "                > db add json <path-to-json-db-entry>\n"
+      "                > db rm <hash> - remove document\n"
+      "                > db list - list all documents\n"
+      "                > db list hash - list all document hashes\n"
+      "                > db list numdoc - list number of documents\n"
+      "                > db list numusr - list number of users in db\n\n"
+      "      exit, quit, q\n"
+      "                Exit\n\n"
+      "      help\n"
+      "                This help message\n\n"
+      "      keys\n"
+      "                Show monero wallet keys of current user\n\n"
+      "      monerod [<host>[:<port>]]\n"
+      "                Specify monero node to connect to. The <host> argument specifies\n"
+      "                a hostname or an IPv4 address in standard dot notation. The\n"
+      "                optional <port> argument is an integer specifying a port. The\n"
+      "                default is " + monerod_host + ". Without an argument, show current\n"
+      "                setting. Use "" to clear the setting and use an offline wallet.\n\n"
+      "      new\n"
+      "                Create new user identity. This will generate a new monero wallet\n"
+      "                which will be used as a user id when creating an ad or paying for\n"
+      "                an item. This wallet can be used just like any other monero wallet.\n"
+      "                If you want to use your existing monero wallet, see 'user'.\n\n"
+      "      peers\n"
+      "                List server peers\n\n"
+      "      server [<host>[:<port>]] [<public-key>]\n"
+      "                Specify server to send commands to. The <host> argument specifies\n"
+      "                a hostname or an IPv4 address in standard dot notation. The\n"
+      "                optional <port> argument is an integer specifying a port. The\n"
+      "                default is " + host + ". The optional public-key is the\n"
+      "                server's public key to use for authenticated and secure\n"
+      "                connections. Without an argument, show current setting. Use "" to\n"
+      "                clear the setting and use " + piac::cli_executable() + " offline.\n\n"
+      "      user [<mnemonic>]\n"
+      "                Show active monero wallet mnemonic seed (user id) if no mnemonic is\n"
+      "                given. Switch to mnemonic if given.\n\n"
+      "      version\n"
+      "                Display " + piac::cli_executable() + " version\n";
 
     } else if (!strcmp(buf,"keys")) {
 
       piac::show_wallet_keys( wallet );
 
+    } else if (buf[0]=='m' && buf[1]=='o' && buf[2]=='n' && buf[3]=='e'&&
+               buf[4]=='r' && buf[5]=='o' && buf[6]=='d') {
+
+      std::string b( buf );
+      auto t = piac::tokenize( b );
+      epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
+      if (t.size() == 1) {
+        if (monerod_host.empty())
+          std::cout << "Wallet offline\n";
+        else
+          std::cout << "Wallet connecting to monero daemon at "
+                    << monerod_host << '\n';
+      } else {
+        monerod_host = t[1];
+        if (monerod_host == "\"\"") {
+          monerod_host.clear();
+          std::cout << "Offline\n";
+        } else {
+          std::cout << "Wallet connecting to monero daemon at "
+                    << monerod_host << '\n';
+        }
+      }
+      epee::set_console_color( epee::console_color_default, /*bright=*/ false );
+
     } else if (!strcmp(buf,"new")) {
 
-      wallet = piac::create_wallet();
+      wallet = piac::create_wallet( monerod_host, listener );
 
     } else if (!strcmp(buf,"peers")) {
 
       piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
                       rpc_client_keys, wallet );
+
+    } else if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
+               buf[4]=='e' && buf[5]=='r') {
+
+      std::string b( buf );
+      auto t = piac::tokenize( b );
+      epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
+      if (t.size() == 1) {
+        if (host.empty())
+          std::cout << "Offline\n";
+        else
+          std::cout << "Will connect to piac daemon at " << host << '\n';
+      } else {
+        host = t[1];
+        if (host == "\"\"") {
+          host.clear();
+          std::cout << "Offline\n";
+        } else {
+          std::cout << "Will connect to piac daemon at " << host;
+          if (t.size() > 2) {
+            std::cout << ", using public key: " << t[2];
+            rpc_server_public_key = t[2];
+          }
+          std::cout << '\n';
+        }
+      }
+      epee::set_console_color( epee::console_color_default, /*bright=*/ false );
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
 
@@ -683,7 +794,7 @@ int main( int argc, char **argv ) {
       } else if (piac::wordcount(mnemonic) != 25) {
         std::cout << "Need 25 words\n";
       } else {
-        wallet = piac::switch_user( mnemonic );
+        wallet = piac::switch_user( mnemonic, monerod_host, listener );
       }
 
     } else if (!strcmp(buf,"version")) {
@@ -699,7 +810,7 @@ int main( int argc, char **argv ) {
     if (strlen( buf ) > 0) add_history( buf );
 
     // readline malloc's a new buffer every time
-    free( buf );
+    if (buf) free( buf );
   }
 
   MDEBUG( "graceful exit" );

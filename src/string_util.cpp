@@ -15,6 +15,7 @@ piac::trim( std::string& s ) {
 // ****************************************************************************
 std::vector< std::string >
 piac::tokenize( std::string& s ) {
+  if (s.empty()) return {};
   using std::regex;
   using std::string;
   using std::sregex_token_iterator;
