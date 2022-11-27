@@ -20,8 +20,9 @@ authenticated.
 - The command-line interface client
    * connects users to daemons and the ad database,
    * authenticates users via a monero wallet mnemonic seed,
-   * can issue basic queries to the db, in a web search fashion,
-   * can add or remove ads after user authententication.
+   * can issue basic queries to the ad db in a web search fashion,
+   * can add or remove ads after user authententication,
+   * can query and monitor wallet balance connecting to a monero daemon.
 
 # progress/to-do
 
@@ -41,12 +42,12 @@ Here is a todo list in no particular order:
 - [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
 - [ ] add p2p traffic encryption and authentication
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
+- [ ] add messaging between users via matrix (WIP)
 - [ ] allow user to save other users in addressbook (matrixuser + monero address)
-- [ ] add messaging between users via matrix (libkazv)
 - [x] allow connecting to local monero node
 - [ ] allow connecting to remote monero node (WIP)
 - [ ] allow running local monero node
-- [x] allow user to see balance (sync wallet in background)
+- [x] allow user to query balance (sync wallet in background)
 - [ ] allow user to buy something
 - [ ] allow user to track order status
 - [ ] allow user to create whishlist
