@@ -46,3 +46,28 @@ mkdir build && cd build && cmake -GNinja .. && ninja && cd -
 cd build && ctest
 ```
 
+## Build documentation
+
+```sh
+mkdir build && cd build && cmake -GNinja ..
+ninja doc
+firefox --new-tab doc/html/index.html
+```
+
+## Build test code coverage and static analysis report
+
+```sh
+mkdir build && cd build && cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DCOVERAGE=on ..
+ninja test_coverage
+firefox --new-tab doc/html/DEBUG/test_coverage/index.html
+ninja cppcheck-xml
+firefox --new-tab doc/html/DEBUG/cppcheck/index.html
+```
+
+```sh
+mkdir build && cd build && cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCOVERAGE=on ..
+ninja test_coverage
+firefox --new-tab doc/html/RELEASE/test_coverage/index.html
+ninja cppcheck-xml
+firefox --new-tab doc/html/RELEASE/cppcheck/index.html
+```
