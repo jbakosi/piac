@@ -54,7 +54,7 @@ ninja doc
 firefox --new-tab doc/html/index.html
 ```
 
-## Build test code coverage and static analysis report
+## Build test code coverage and static analysis reports
 
 ```sh
 mkdir build && cd build && cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DCOVERAGE=on ..
