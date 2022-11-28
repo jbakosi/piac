@@ -225,6 +225,27 @@ install(TARGETS monero_util
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
+add_library(p2p_thread ${PIAC_SOURCE_DIR}/p2p_thread.cpp)
+target_include_directories(p2p_thread PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS})
+set_target_properties(p2p_thread PROPERTIES LIBRARY_OUTPUT_NAME piac_p2p_thread)
+install(TARGETS p2p_thread
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+add_library(db_thread ${PIAC_SOURCE_DIR}/db_thread.cpp)
+target_include_directories(db_thread PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS})
+set_target_properties(db_thread PROPERTIES LIBRARY_OUTPUT_NAME piac_db_thread)
+install(TARGETS db_thread
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
 add_executable(${DAEMON_EXECUTABLE}
@@ -236,11 +257,14 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
+                      db_thread
+                      p2p_thread
                       db
                       document
                       logging_util
                       string_util
                       crypto_util
+                      zmq_util
                       ${XAPIAN_LIBRARIES}
                       ${ZMQPP_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}

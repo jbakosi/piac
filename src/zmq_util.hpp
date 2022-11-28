@@ -48,4 +48,8 @@ pirate_send( const std::string& cmd,
              const std::string& rpc_server_public_key,
              const zmqpp::curve::keypair& client_keys );
 
+//! Try to bind ZMQ socket, attempting unused ports
+void
+try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports );
+
 } // piac::

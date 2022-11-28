@@ -123,7 +123,6 @@ main( int argc, char **argv )
 //! \return Error code to return to shell
 // *****************************************************************************
 {
-
   // save command line
   std::vector< std::string > args( argv, argv+argc );
   std::stringstream cmdline;

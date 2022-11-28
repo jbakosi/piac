@@ -35,7 +35,7 @@ Here is a todo list in no particular order:
 - [x] build/test with clang
 - [x] add `-Wall` to build system
 - [x] set up generation of code coverage (gcov, cppcheck)
-- [ ] refactor + add doxygen docs (WIP)
+- [x] refactor + add doxygen docs
 - [ ] add images to ads in db
 - [ ] purge ad after completion of purchase
 - [ ] add ad authentication (WIP)

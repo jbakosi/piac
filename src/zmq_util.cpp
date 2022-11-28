@@ -105,3 +105,31 @@ piac::pirate_send( const std::string& cmd,
   MDEBUG( "Destroyed socket to " + host );
   return reply;
 }
+
+void
+piac::try_bind( zmqpp::socket& sock, int& port, int range, bool use_strict_ports )
+// *****************************************************************************
+//  Try to bind ZMQ socket, attempting unused ports
+//! \param[in,out] sock Socket to use
+//! \param[in,out] port Port to try first
+//! \param[in] range Number of ports to attempt in increasing order: port+range
+//! \param[in] use_strict_ports True to try only the default port
+// *****************************************************************************
+{
+  if (use_strict_ports) {
+    sock.bind( "tcp://*:" + std::to_string(port) );
+    return;
+  }
+
+  do {
+    try {
+      sock.bind( "tcp://*:" + std::to_string(port) );
+      return;
+    }
+    catch ( zmqpp::exception& ) {}
+    ++port;
+  } while (port < port+range );
+
+  MERROR( "Could not bind to socket within range: ["
+          << port << ',' << port+range << ')' );
+}
