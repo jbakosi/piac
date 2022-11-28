@@ -199,6 +199,32 @@ install(TARGETS string_util
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
+add_library(zmq_util ${PIAC_SOURCE_DIR}/zmq_util.cpp)
+target_include_directories(zmq_util PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${ZMQPP_INCLUDE_DIRS})
+set_target_properties(zmq_util
+                      PROPERTIES LIBRARY_OUTPUT_NAME piac_zmq_util)
+install(TARGETS zmq_util
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
+add_library(monero_util ${PIAC_SOURCE_DIR}/monero_util.cpp)
+target_include_directories(monero_util PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${TPL_DIR}/include
+                           ${TPL_DIR}/include/common
+                           ${TPL_DIR}/include/crypto
+                           ${TPL_DIR}/include/utils
+                           ${TPL_DIR}/include/storages)
+set_target_properties(monero_util
+                      PROPERTIES LIBRARY_OUTPUT_NAME piac_monero_util)
+install(TARGETS monero_util
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
 add_executable(${DAEMON_EXECUTABLE}
@@ -234,16 +260,13 @@ add_executable(${CLI_EXECUTABLE}
                ${PIAC_SOURCE_DIR}/cli.cpp)
 target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
-                           ${TPL_DIR}/include/utils
-                           ${TPL_DIR}/include/common
-                           ${TPL_DIR}/include/crypto
-                           ${TPL_DIR}/include/storages
-                           ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       logging_util
-                      crypto_util
                       string_util
+                      monero_util
+                      crypto_util
+                      zmq_util
                       ${ZMQPP_LIBRARIES}
                       ${Readline_LIBRARY}
                       ${Boost_SERIALIZATION_LIBRARY}

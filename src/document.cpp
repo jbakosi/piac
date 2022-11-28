@@ -1,3 +1,12 @@
+// *****************************************************************************
+/*!
+  \file      src/document.cpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac document functionality to interact with database library
+*/
+// *****************************************************************************
+
 #include <vector>
 
 #include "document.hpp"
@@ -5,9 +14,14 @@
 using piac::Document;
 using piac::Documents;
 
-// ****************************************************************************
 bool
-Document::deserialize( const rapidjson::Value& obj ) {
+Document::deserialize( const rapidjson::Value& obj )
+// ****************************************************************************
+//  Deserialize (piac) document state from JSON object
+//! \param[in] obj Input JSON object
+//! \return True if no error occurred
+// ****************************************************************************
+{
   id( obj["id"].GetInt() );
   title( obj["title"].GetString() );
   author( obj["author"].GetString() );
@@ -22,16 +36,14 @@ Document::deserialize( const rapidjson::Value& obj ) {
   return true;
 }
 
-// ****************************************************************************
-bool
-Document::deserialize( const std::string& s ) {
-  return JSONBase::deserialize( s );
-}
-
-// ****************************************************************************
 bool
 Document::serialize( rapidjson::Writer< rapidjson::StringBuffer >* writer )
 const
+// ****************************************************************************
+//  Serialize (piac) document state to JSON format
+//! \param[in] writer Pointer to rapidjson write object to write object to
+//! \return True if no error occurred
+// ****************************************************************************
 {
   writer->StartObject();
   writer->String( "id" );        writer->Int( m_id );
@@ -49,15 +61,14 @@ const
   return true;
 }
 
-// ****************************************************************************
-std::string
-Document::serialize() const {
-  return JSONBase::serialize();
-}
-
-// ****************************************************************************
 bool
-Documents::deserialize( const std::string& s ) {
+Documents::deserialize( const std::string& s )
+// ****************************************************************************
+//  Deserialize multiple (piac) ddocuments from JSON format
+//! \param[in] s String containing multiple JSON formatted documents
+//! \return True if no error occurred
+// ****************************************************************************
+{
   rapidjson::Document jdoc;
   if (not initDocument( s, jdoc )) return false;
   if (jdoc.IsArray()) {
@@ -74,10 +85,14 @@ Documents::deserialize( const std::string& s ) {
   return true;
 }
 
-// ****************************************************************************
 bool
 Documents::serialize( rapidjson::Writer<rapidjson::StringBuffer>* writer )
 const
+// ****************************************************************************
+//  Serialize multiple (piac) documents to JSON format
+//! \param[in] writer Pointer to rapidjson write object to write object to
+//! \return True if no error occurred
+// ****************************************************************************
 {
   writer->StartArray();
   for (const auto& d : m_documents) d.serialize(writer);

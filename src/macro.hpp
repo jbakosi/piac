@@ -1,3 +1,12 @@
+// *****************************************************************************
+/*!
+  \file      src/macro.hpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Useful macros
+*/
+// *****************************************************************************
+
 #pragma once
 
 // Macro to detect strictly gcc. __GNUC__ and __GNUG__ were intended to

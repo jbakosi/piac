@@ -1,3 +1,12 @@
+// *****************************************************************************
+/*!
+  \file      src/logging_util.hpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac logging utilities, hookiing up with that of monero
+*/
+// *****************************************************************************
+
 #pragma once
 
 #include "macro.hpp"
@@ -28,6 +37,7 @@
 
 namespace piac {
 
+//! Hook up to monero's logging infrastructure
 void setup_logging( const std::string& logfile,
                     const std::string& log_level,
                     bool console_logging,

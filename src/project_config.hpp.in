@@ -1,4 +1,11 @@
-// Project configuration imported from cmake
+// *****************************************************************************
+/*!
+  \file      src/project_config.hpp.in
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac project configuartion imported build system data from cmake
+*/
+// *****************************************************************************
 
 #pragma once
 

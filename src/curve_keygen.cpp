@@ -1,4 +1,11 @@
-// Generates a CurveZMQ keypair
+// *****************************************************************************
+/*!
+  \file      src/curve_keygen.cpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Generate a CurveZMQ keypair
+*/
+// *****************************************************************************
 
 #include <iostream>
 #include <zmqpp/curve.hpp>

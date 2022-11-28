@@ -1,3 +1,12 @@
+// *****************************************************************************
+/*!
+  \file      src/crypto_util.cpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac cryptography utilities
+*/
+// *****************************************************************************
+
 #include <cryptopp/sha.h>
 #include <cryptopp/files.h>
 #include <cryptopp/hex.h>
@@ -11,9 +20,14 @@
   #pragma clang diagnostic ignored "-Wold-style-cast"
 #endif
 
-// ****************************************************************************
 std::string
-piac::sha256( const std::string& msg ) {
+piac::sha256( const std::string& msg )
+// ****************************************************************************
+//  Compute sha256 hash of a string
+//! \param[in] msg String whose hash to compute
+//! \return Hash computed
+// ****************************************************************************
+{
   using namespace CryptoPP;
   std::string digest;
   SHA256 hash;
@@ -27,9 +41,14 @@ piac::sha256( const std::string& msg ) {
   #pragma clang diagnostic pop
 #endif
 
-// ****************************************************************************
 std::string
-piac::hex( const std::string& digest ) {
+piac::hex( const std::string& digest )
+// ****************************************************************************
+//  Compute hex encoding of a string
+//! \param[in] digest String to encode in hex
+//! \return Hex encoding
+// ****************************************************************************
+{
   using namespace CryptoPP;
   std::string hex;
   HexEncoder encoder( new StringSink( hex ) );

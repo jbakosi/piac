@@ -1,204 +1,37 @@
-#include "macro.hpp"
-
-#if defined(__clang__)
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wundef"
-  #pragma clang diagnostic ignored "-Wpadded"
-  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
-  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
-  #pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
-  #pragma clang diagnostic ignored "-Wdocumentation"
-  #pragma clang diagnostic ignored "-Wweak-vtables"
-  #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
-#endif
-
-#include <zmqpp/zmqpp.hpp>
-
-#if defined(__clang__)
-  #pragma clang diagnostic pop
-#endif
-
-#include <zmqpp/curve.hpp>
+// *****************************************************************************
+/*!
+  \file      src/cli.cpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac command line interface
+*/
+// *****************************************************************************
 
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <getopt.h>
-#include <unistd.h>
 
-#if defined(__clang__)
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wdeprecated-copy-dtor"
-  #pragma clang diagnostic ignored "-Wnon-virtual-dtor"
-  #pragma clang diagnostic ignored "-Wsuggest-override"
-  #pragma clang diagnostic ignored "-Wunused-template"
-  #pragma clang diagnostic ignored "-Wsign-conversion"
-  #pragma clang diagnostic ignored "-Wcast-qual"
-  #pragma clang diagnostic ignored "-Wheader-hygiene"
-  #pragma clang diagnostic ignored "-Wshadow"
-  #pragma clang diagnostic ignored "-Wshadow-field"
-  #pragma clang diagnostic ignored "-Wextra-semi"
-  #pragma clang diagnostic ignored "-Wextra-semi-stmt"
-  #pragma clang diagnostic ignored "-Wdocumentation"
-  #pragma clang diagnostic ignored "-Wunused-parameter"
-  #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
-  #pragma clang diagnostic ignored "-Wdouble-promotion"
-  #pragma clang diagnostic ignored "-Wsuggest-destructor-override"
-  #pragma clang diagnostic ignored "-Wreserved-id-macro"
-  #pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
-  #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
-  #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
-  #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
-  #pragma clang diagnostic ignored "-Wold-style-cast"
-  #pragma clang diagnostic ignored "-Wshadow-field-in-constructor"
-  #pragma clang diagnostic ignored "-Wswitch-enum"
-  #pragma clang diagnostic ignored "-Wshorten-64-to-32"
-  #pragma clang diagnostic ignored "-Wcovered-switch-default"
-  #pragma clang diagnostic ignored "-Wdeprecated-dynamic-exception-spec"
-  #pragma clang diagnostic ignored "-Wmissing-noreturn"
-  #pragma clang diagnostic ignored "-Wunused-variable"
-  #pragma clang diagnostic ignored "-Wused-but-marked-unused"
-  #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
-  #pragma clang diagnostic ignored "-Winconsistent-missing-destructor-override"
-  #pragma clang diagnostic ignored "-Wredundant-parens"
-  #pragma clang diagnostic ignored "-Wunused-exception-parameter"
-  #pragma clang diagnostic ignored "-Wreorder-ctor"
-  #pragma clang diagnostic ignored "-Wweak-vtables"
-  #pragma clang diagnostic ignored "-Wshift-count-overflow"
-  #pragma clang diagnostic ignored "-Wgnu-anonymous-struct"
-  #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
-#elif defined(STRICT_GNUC)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wunused-parameter"
-  #pragma GCC diagnostic ignored "-Wreorder"
-#endif
-
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-#include "wallet/monero_wallet_full.h"
-
-#if defined(__clang__)
-  #pragma clang diagnostic pop
-#elif defined(STRICT_GNUC)
-  #pragma GCC diagnostic pop
-#endif
-
+#include "macro.hpp"
 #include "project_config.hpp"
 #include "string_util.hpp"
-#include "crypto_util.hpp"
 #include "logging_util.hpp"
+#include "zmq_util.hpp"
+#include "monero_util.hpp"
 
-#define REQUEST_TIMEOUT     3000   //  msecs, (> 1000!)
-#define REQUEST_RETRIES     5      //  before we abandon trying to send
-
+//! Piac declarations and definitions
 namespace piac {
-
-// *****************************************************************************
-static zmqpp::socket
-daemon_socket( zmqpp::context& ctx,
-               const std::string& host,
-               const std::string& rpc_server_public_key,
-               const zmqpp::curve::keypair& client_keys )
-{
-  MINFO( "Connecting to " << host );
-  auto sock = zmqpp::socket( ctx, zmqpp::socket_type::req );
-
-  if (not rpc_server_public_key.empty()) {
-    try {
-      sock.set( zmqpp::socket_option::curve_server_key, rpc_server_public_key );
-      sock.set( zmqpp::socket_option::curve_public_key, client_keys.public_key );
-      sock.set( zmqpp::socket_option::curve_secret_key, client_keys.secret_key );
-    } catch ( zmqpp::exception& ) {}
-  }
-
-  sock.connect( "tcp://" + host );
-  //  configure socket to not wait at close time
-  sock.set( zmqpp::socket_option::linger, 0 );
-  return sock;
-}
-
-// *****************************************************************************
-static std::string
-pirate_send( const std::string& cmd,
-             zmqpp::context& ctx,
-             const std::string& host,
-             const std::string& rpc_server_public_key,
-             const zmqpp::curve::keypair& client_keys )
-{
-  std::string reply;
-  int retries = REQUEST_RETRIES;
-  auto server = daemon_socket( ctx, host, rpc_server_public_key, client_keys );
-
-  // send cmd from a Lazy Pirate client
-  while (retries) {
-    std::string request = cmd;
-    server.send( request );
-    if (retries != REQUEST_RETRIES) sleep(1);
-
-    zmqpp::poller poller;
-    poller.add( server );
-    bool expect_reply = true;
-    while (expect_reply) {
-      if (poller.poll(REQUEST_TIMEOUT) && poller.has_input(server)) {
-        server.receive( reply );
-        if (not reply.empty()) {
-          MDEBUG( "Recv reply: " + reply );
-          expect_reply = false;
-          retries = 0;
-        } else {
-          MERROR( "Recv empty msg from daemon" );
-        }
-      } else if (--retries == 0) {
-        MERROR( "Abandoning server at " + host );
-        reply = "No response from server";
-        expect_reply = false;
-      } else {
-        MWARNING( "No response from " + host + ", retrying: " << retries );
-        poller.remove( server );
-        server = daemon_socket( ctx, host, rpc_server_public_key, client_keys );
-        poller.add( server );
-        server.send( request );
-      }
-    }
-  }
-
-  MDEBUG( "Destroyed socket to " + host );
-  return reply;
-}
-
-// *****************************************************************************
-static void
-send_cmd( std::string cmd,
-          zmqpp::context& ctx,
-          const std::string& host,
-          const std::string& rpc_server_public_key,
-          const zmqpp::curve::keypair& client_keys,
-          const std::unique_ptr< monero_wallet_full >& wallet )
-{
-  piac::trim( cmd );
-  MDEBUG( cmd );
-
-  // append author if cmd contains "db add/rm"
-  auto npos = std::string::npos;
-  if ( cmd.find("db") != npos &&
-      (cmd.find("add") != npos || cmd.find("rm") != npos) )
-  {
-    if (not wallet) {
-      std::cout << "Need active user id (wallet) to add to db. "
-                   "See 'new' or 'user'.\n";
-      return;
-    }
-    cmd += " AUTH:" + piac::sha256( wallet->get_primary_address() );
-  }
-
-  // send message to daemon with command
-  auto reply = pirate_send( cmd, ctx, host, rpc_server_public_key, client_keys );
-  std::cout << reply << '\n';
-}
 
 enum COLOR { RED, GREEN, BLUE, GRAY, YELLOW };
 
-// *****************************************************************************
 static std::string
-color_string( const std::string &s, COLOR color = GRAY ) {
+color_string( const std::string &s, COLOR color = GRAY )
+// *****************************************************************************
+//! Insert ASCI color string code to a string
+//! \param[in] s String to append
+//! \param[in] color Color code to insert
+//! \return String postfixed with ASCII color code
+// *****************************************************************************
+{
   std::string ret;
   if (color == RED) ret = "\033[0;31m";
   if (color == GREEN) ret = "\033[0;32m";
@@ -208,156 +41,14 @@ color_string( const std::string &s, COLOR color = GRAY ) {
   return ret + s + "\033[0m";
 }
 
-// wallet sync listener class
-class WalletListener : public monero::monero_wallet_listener {
-  public:
-    WalletListener() : m_height( 0 ), m_start_height( 0 ), m_end_height( 0 ),
-      m_percent_done( 0.0 ), m_message() {}
-    void on_sync_progress( uint64_t height, uint64_t start_height,
-                           uint64_t end_height, double percent_done,
-                           const std::string& message ) override
-    {
-      m_height = height;
-      m_start_height = start_height;
-      m_end_height = end_height;
-      m_percent_done = percent_done;
-      m_message = message;
-    }
-    virtual ~WalletListener() = default;
-    uint64_t height() const { return m_height; }
-    uint64_t start_height() const { return m_start_height; }
-    uint64_t end_height() const { return m_end_height; }
-    double percent_done() const { return m_percent_done; }
-    std::string message() const { return m_message; }
-  private:
-    uint64_t m_height;
-    uint64_t m_start_height;
-    uint64_t m_end_height;
-    double m_percent_done;
-    std::string m_message;
-};
-
-// *****************************************************************************
 static void
-start_syncing( const std::string& msg,
-               monero_wallet_full* wallet,
-               WalletListener& listener )
+load_key( const std::string& filename, std::string& key )
+// *****************************************************************************
+//! Load keys from file
+//! \param[in] filename File to load keys from
+//! \param[in] key String to store key in
+// *****************************************************************************
 {
-  std::cout << msg;
-  if (wallet->is_connected_to_daemon()) {
-    std::cout << ", starting background sync, check progress with 'balance'\n";
-    wallet->add_listener( listener );
-    wallet->start_syncing( /* sync period in ms = */ 10000 );
-  } else {
-    std::cout << ", no connection to monero daemon, see 'monerod'\n";
-  }
-}
-
-// *****************************************************************************
-[[nodiscard]] static std::unique_ptr< monero_wallet_full >
-create_wallet( const std::string& monerod_host, WalletListener& listener ) {
-  MDEBUG( "new" );
-  monero::monero_wallet_config wallet_config;
-  wallet_config.m_network_type = monero_network_type::STAGENET;
-  wallet_config.m_server_uri = monerod_host;
-  auto wallet = monero_wallet_full::create_wallet( wallet_config );
-  start_syncing( "Created new user/wallet", wallet, listener );
-  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n' <<
-    "This is your monero wallet mnemonic seed that identifies you within\n"
-    "piac. You can use it to create your ads or pay for a product. This seed\n"
-    "can be restored within your favorite monero wallet software and you can\n"
-    "use this wallet just like any other monero wallet. Save this seed and\n"
-    "keep it secret.\n";
-  return std::unique_ptr< monero_wallet_full >( wallet );
-}
-
-// *****************************************************************************
-static void
-show_wallet_keys( const std::unique_ptr< monero_wallet_full >& wallet ) {
-  MDEBUG( "keys" );
-  if (not wallet) {
-    std::cout << "Need active user id (wallet). See 'new' or 'user'.\n";
-    return;
-  }
-  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
-  std::cout << "Primary address: " << wallet->get_primary_address() << '\n';
-  std::cout << "Secret view key: " << wallet->get_private_view_key() << '\n';
-  std::cout << "Public view key: " << wallet->get_public_view_key() << '\n';
-  std::cout << "Secret spend key: " << wallet->get_private_spend_key() << '\n';
-  std::cout << "Public spend key: " << wallet->get_public_spend_key() << '\n';
-}
-
-// *****************************************************************************
-static void
-show_wallet_balance( const std::unique_ptr< monero_wallet_full >& wallet,
-                     const WalletListener& listener )
-{
-  MDEBUG( "balance" );
-  if (not wallet) {
-    std::cout << "Need active user id (wallet). See 'new' or 'user'.\n";
-    return;
-  }
-  std::cout << "Balance = " << std::fixed << std::setprecision( 6 )
-            << static_cast< double >( wallet->get_balance() ) / 1.0e+12
-            << " XMR\n";
-  std::cout << "Wallet sync start height: " << listener.start_height() << '\n';
-  std::cout << "Wallet sync height: " << listener.height() << '\n';
-  std::cout << "Wallet sync end height: " << listener.end_height() << '\n';
-  std::cout << "Wallet sync at: " << std::fixed << std::setprecision( 2 )
-            << listener.percent_done() * 100.0 << "%\n";
-}
-
-// *****************************************************************************
-[[nodiscard]] static
-std::unique_ptr< monero_wallet_full >
-switch_user( const std::string& mnemonic,
-             const std::string& monerod_host,
-             WalletListener& listener )
-{
-  MDEBUG( "user" );
-  assert( not mnemonic.empty() );
-  monero::monero_wallet_config wallet_config;
-  wallet_config.m_mnemonic = mnemonic;
-  wallet_config.m_network_type = monero_network_type::STAGENET;
-  wallet_config.m_server_uri = monerod_host;
-  auto wallet = monero_wallet_full::create_wallet( wallet_config );
-  start_syncing( "Switched to new user/wallet", wallet, listener );
-  return std::unique_ptr< monero_wallet_full >( wallet );
-}
-
-// *****************************************************************************
-static void
-show_user( const std::unique_ptr< monero_wallet_full >& wallet ) {
-  MDEBUG( "user" );
-  if (not wallet) {
-    std::cout << "No active user id (wallet). See 'new' or 'user'.\n";
-    return;
-  }
-  std::cout << "Mnemonic seed: " << wallet->get_mnemonic() << '\n';
-}
-
-// ****************************************************************************
-[[nodiscard]] static int
-wordcount( const std::string& s ) {
-  auto str = s.data();
-  if (str == nullptr) return 0;
-  bool inSpaces = true;
-  int numWords = 0;
-  while (*str != '\0') {
-    if (std::isspace(*str)) {
-      inSpaces = true;
-    } else if (inSpaces) {
-      numWords++;
-      inSpaces = false;
-    }
-     ++str;
-  }
-  return numWords;
-}
-
-// *****************************************************************************
-static void
-load_key( const std::string& filename, std::string& key ) {
   if (filename.empty() || not key.empty()) return;
   std::ifstream f( filename );
   if (not f.good()) {
@@ -372,9 +63,14 @@ load_key( const std::string& filename, std::string& key ) {
   MINFO( "Read key from file " << filename );
 }
 
-// *****************************************************************************
 static std::string
-usage( const std::string& logfile ) {
+usage( const std::string& logfile )
+// *****************************************************************************
+//! Return program usage information
+//! \param[in] logfile Logfile name
+//! \return String containing usage information
+// *****************************************************************************
+{
   return "Usage: " + piac::cli_executable() + " [OPTIONS]\n\n"
          "OPTIONS\n"
          "  --help\n"
@@ -418,8 +114,15 @@ usage( const std::string& logfile ) {
 
 } // piac::
 
+int
+main( int argc, char **argv )
 // *****************************************************************************
-int main( int argc, char **argv ) {
+//! Piac command line interface main function
+//! \param[in] argc Number of command line arguments passed from shell
+//! \param[in] argv List of command line arguments passed from shell
+//! \return Error code to return to shell
+// *****************************************************************************
+{
 
   // save command line
   std::vector< std::string > args( argv, argv+argc );

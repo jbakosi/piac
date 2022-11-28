@@ -1,19 +1,34 @@
+// *****************************************************************************
+/*!
+  \file      src/document.hpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac document classes to interact with database library
+*/
+// *****************************************************************************
+
 #pragma once
 
 #include "jsonbase.hpp"
 
 namespace piac {
 
+//! Document class to hold a database document and help with JSON serialization
 class Document : public JSONBase {
   public:
-    virtual bool deserialize( const rapidjson::Value& obj ) override;
+    //! Deserialize document state from JSON object
+    bool deserialize( const rapidjson::Value& obj ) override;
 
-    bool deserialize( const std::string& s ) override;
+    bool deserialize( const std::string& s ) override {
+      return JSONBase::deserialize( s );
+    }
 
-    virtual bool serialize( rapidjson::Writer<rapidjson::StringBuffer>* writer )
+    bool serialize( rapidjson::Writer<rapidjson::StringBuffer>* writer )
       const override;
 
-    [[nodiscard]] std::string serialize() const override;
+    [[nodiscard]] std::string serialize() const override {
+      return JSONBase::serialize();
+    }
 
     int id() const { return m_id; }
     void id( int i ) { m_id = i; }
@@ -67,15 +82,14 @@ class Document : public JSONBase {
     std::string m_sha;
 };
 
+//! Multiple document hold a list of database documents
 class Documents : public JSONBase {
   public:
-    virtual bool deserialize( const std::string& s ) override;
+    bool deserialize( const std::string& s ) override;
 
-    virtual bool deserialize( const rapidjson::Value& ) override {
-      return false;
-    }
+    bool deserialize( const rapidjson::Value& ) override { return false; }
 
-    virtual bool serialize( rapidjson::Writer<rapidjson::StringBuffer>* writer )
+    bool serialize( rapidjson::Writer<rapidjson::StringBuffer>* writer )
       const override;
 
     [[nodiscard]] std::string serialize() const override {

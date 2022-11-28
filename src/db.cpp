@@ -1,3 +1,12 @@
+// *****************************************************************************
+/*!
+  \file      src/db.cpp
+  \copyright 2022-2023 J. Bakosi,
+             All rights reserved. See the LICENSE file for details.
+  \brief     Piac database functionality
+*/
+// *****************************************************************************
+
 #include <string>
 
 #include "string_util.hpp"
@@ -6,9 +15,14 @@
 #include "db.hpp"
 #include "document.hpp"
 
-// *****************************************************************************
 Xapian::doccount
-piac::get_doccount( const std::string db_name ) {
+piac::get_doccount( const std::string db_name )
+// *****************************************************************************
+//  Get number of documents in Xapian database
+//! \param[in] db_name Name of Xapian db to operate on
+//! \return Number of documents in database
+// *****************************************************************************
+{
   try {
     Xapian::Database db( db_name );
     return db.get_doccount();
@@ -18,12 +32,19 @@ piac::get_doccount( const std::string db_name ) {
   return {};
 }
 
-// ****************************************************************************
 std::string
 piac::add_document( const std::string& author,
                     Xapian::TermGenerator& indexer,
                     Xapian::WritableDatabase& db,
                     Document& ndoc )
+// ****************************************************************************
+//  Add document to Xapian database
+//! \param[in] author Author of the database document
+//! \param[in,out] indexer Xapian indexer to use for database indexing
+//! \param[in,out] db Xapian database object to add document to
+//! \param[in,out] ndoc Json document to add
+//! \return Hash of the document added
+// ****************************************************************************
 {
   assert( not author.empty() );
   Xapian::Document doc;
@@ -70,12 +91,19 @@ piac::add_document( const std::string& author,
   return sha;
 }
 
-// ****************************************************************************
 std::string
 piac::index_db( const std::string& author,
                 const std::string& db_name,
                 const std::string& input_filename,
                 const std::unordered_set< std::string >& my_hashes )
+// ****************************************************************************
+//  Index Xapian database
+//! \param[in] author Author of the database document
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in] input_filename File to read JSON data from
+//! \param[in] my_hashes Hashes to check for duplicates when adding documents
+//! \return Info string showing how many documents have been added
+// ****************************************************************************
 {
   assert( not author.empty() );
 
@@ -116,9 +144,15 @@ piac::index_db( const std::string& author,
   return "Added " + std::to_string( numins ) + " entries";
 }
 
+[[nodiscard]] std::string
+piac::db_query( const std::string& db_name, std::string&& cmd )
 // *****************************************************************************
-std::string
-piac::db_query( const std::string& db_name, std::string&& cmd ) {
+//  Query Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in,out] cmd Query command
+//! \return Result of the database query
+// *****************************************************************************
+{
   try {
 
     MDEBUG( "db query: '" << cmd << "'" );
@@ -161,10 +195,15 @@ piac::db_query( const std::string& db_name, std::string&& cmd ) {
   return {};
 }
 
-// *****************************************************************************
-std::vector< std::string >
+[[nodiscard]] std::vector< std::string >
 piac::db_get_docs( const std::string& db_name,
                    const std::vector< std::string >& hashes )
+// *****************************************************************************
+//  Get documents from Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in] hashes Hashes of database documents to get retrieve
+//! \return Result of the database query
+// *****************************************************************************
 {
   std::vector< std::string > docs;
   try {
@@ -190,10 +229,15 @@ piac::db_get_docs( const std::string& db_name,
   return docs;
 }
 
-// *****************************************************************************
 std::size_t
 piac::db_put_docs( const std::string& db_name,
                    const std::vector< std::string >& docs )
+// *****************************************************************************
+//  Put documents to Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in] docs Documents to insert to Xapian database
+//! \return Number of documents inserted
+// *****************************************************************************
 {
   try {
     MDEBUG( "Inserting & indexing " << docs.size() << " new entries" );
@@ -227,12 +271,19 @@ piac::db_put_docs( const std::string& db_name,
   return 0;
 }
 
-// *****************************************************************************
 std::string
 piac::db_rm_docs( const std::string& author,
                   const std::string& db_name,
                   const std::unordered_set< std::string >& hashes_to_delete,
                   const std::unordered_set< std::string >& my_hashes )
+// *****************************************************************************
+//  Remove documents from Xapian database
+//! \param[in] author Author of the database document
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in] hashes_to_delete Hashes of documents to delete
+//! \param[in] my_hashes Hashes to check for duplicates when removing documents
+//! \return Info on number of documents removed
+// *****************************************************************************
 {
   std::size_t numrm = 0;
   try {
@@ -269,9 +320,15 @@ piac::db_rm_docs( const std::string& author,
   return "Removed " + std::to_string( numrm ) + " entries";
 }
 
+[[nodiscard]] std::vector< std::string >
+piac::db_list_hash( const std::string& db_name, bool inhex )
 // *****************************************************************************
-std::vector< std::string >
-piac::db_list_hash( const std::string& db_name, bool inhex ) {
+//  List hashes from Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in] inhex True to list hashes hex-encoded
+//! \return List of hashes
+// *****************************************************************************
+{
   std::vector< std::string > hashes;
   try {
 
@@ -293,9 +350,14 @@ piac::db_list_hash( const std::string& db_name, bool inhex ) {
   return hashes;
 }
 
+[[nodiscard]] std::vector< std::string >
+piac::db_list_doc( const std::string& db_name )
 // *****************************************************************************
-std::vector< std::string >
-piac::db_list_doc( const std::string& db_name ) {
+//  List documents from Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \return List of documents
+// *****************************************************************************
+{
   std::vector< std::string > docs;
   try {
 
@@ -320,9 +382,14 @@ piac::db_list_doc( const std::string& db_name ) {
   return docs;
 }
 
+[[nodiscard]] std::size_t
+piac::db_list_numuser( const std::string& db_name )
 // *****************************************************************************
-std::size_t
-piac::db_list_numuser( const std::string& db_name ) {
+//  List number of unique users in Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \return Number of unique users created documents in database
+// *****************************************************************************
+{
   try {
 
     Xapian::Database db( db_name );
@@ -347,12 +414,19 @@ piac::db_list_numuser( const std::string& db_name ) {
   return {};
 }
 
-// *****************************************************************************
 std::string
 piac::db_add( const std::string& author,
               const std::string& db_name,
               std::string&& cmd,
               const std::unordered_set< std::string >& my_hashes )
+// *****************************************************************************
+//  Add documents to Xapian database
+//! \param[in] author Author of the database document
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in,out] cmd Add command
+//! \param[in] my_hashes Hashes to check for duplicates when adding documents
+//! \return Info string after add database operation
+// *****************************************************************************
 {
   trim( cmd );
   MDEBUG( "db add " + cmd );
@@ -365,12 +439,19 @@ piac::db_add( const std::string& author,
   return "unknown cmd";
 }
 
-// *****************************************************************************
 std::string
 piac::db_rm( const std::string& author,
              const std::string& db_name,
              std::string&& cmd,
              const std::unordered_set< std::string >& my_hashes )
+// *****************************************************************************
+//  Remove documents from Xapian database
+//! \param[in] author Author of the database document
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in,out] cmd Remove command
+//! \param[in] my_hashes Hashes to check for duplicates when removing documents
+//! \return Info string after remove database operation
+// *****************************************************************************
 {
   trim( cmd );
   MDEBUG( "db rm " + cmd );
@@ -383,9 +464,15 @@ piac::db_rm( const std::string& author,
   return "unknown cmd";
 }
 
-// *****************************************************************************
 std::string
-piac::db_list( const std::string& db_name, std::string&& cmd ) {
+piac::db_list( const std::string& db_name, std::string&& cmd )
+// *****************************************************************************
+//  List Xapian database
+//! \param[in] db_name Name of the Xapian database object
+//! \param[in,out] cmd List command
+//! \return List of items queried from database
+// *****************************************************************************
+{
   trim( cmd );
   MDEBUG( "db list " + cmd );
 
