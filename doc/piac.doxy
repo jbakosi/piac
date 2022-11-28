@@ -872,7 +872,7 @@ EXCLUDE_SYMBOLS        =
 # that contain example code fragments that are included (see the \include
 # command).
 
-EXAMPLE_PATH           = @CMAKE_CURRENT_SOURCE_DIR@/doc/examples
+EXAMPLE_PATH           =
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp and
@@ -2373,9 +2373,10 @@ HTML_EXTRA_STYLESHEET = \
     @CMAKE_CURRENT_SOURCE_DIR@/doc/piac.m-dark-noindent+doxygen.compiled.css
 
 ##! M_THEME_COLOR = #22272e
+##! M_FAVICON = @CMAKE_CURRENT_SOURCE_DIR@/doc/images/Eo_circle_blue-grey_letter-p.svg
 
 ##! M_LINKS_NAVBAR1 = \
-##!      "<a href=\"https://codeberg.org/piac/piac\">Source</a> namespaces annotated files coverage"
+##!      "<a href=\"https://codeberg.org/piac/piac\">Source</a> namespaces annotated coverage"
 
 ##! M_LINKS_NAVBAR2 = ""
 

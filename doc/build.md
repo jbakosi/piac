@@ -56,6 +56,7 @@ firefox --new-tab doc/html/index.html
 
 ## Build test code coverage and static analysis reports
 
+In debug mode:
 ```sh
 mkdir build && cd build && cmake -GNinja -DCMAKE_BUILD_TYPE=Debug -DCOVERAGE=on ..
 ninja test_coverage
@@ -64,6 +65,7 @@ ninja cppcheck-xml
 firefox --new-tab doc/html/DEBUG/cppcheck/index.html
 ```
 
+In release/optimized mode:
 ```sh
 mkdir build && cd build && cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCOVERAGE=on ..
 ninja test_coverage
