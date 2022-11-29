@@ -62,7 +62,8 @@ piac::pirate_send( const std::string& cmd,
 //! \param[in] rpc_server_public_key CurveZMQ server public key to use
 //! \param[in] client_keys CurveMQ client keypair to use
 //! \return Response from remote host
-//! \see http://curvezmq.org
+//! \see https://zguide.zeromq.org/docs/chapter4/#Client-Side-Reliability-Lazy-Pirate-Pattern
+//! \see https://github.com/zeromq/libzmq/issues/3495
 // *****************************************************************************
 {
   std::string reply;

@@ -243,6 +243,8 @@ piac::db_thread(
 //! \param[in] rpc_server_keys CurveMQ keypair to use for secure client comm.
 //! \param[in] rpc_authorized_clients Only communicate with these clients if
 //!    secure communication is used to talk to clients
+//! \see http://curvezmq.org
+//! \see http://www.evilpaul.org/wp/2017/05/02/authentication-encryption-zeromq
 // *****************************************************************************
 {
   MLOG_SET_THREAD_NAME( "db" );
