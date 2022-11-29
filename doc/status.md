@@ -63,3 +63,4 @@ Here is a todo list in no particular order:
 - [ ] GUI: bright/dark theme, limits on entries, add ad all in one page
 - [ ] display ad price in XMR (optionally in user-configured currency)
 - [ ] explore anonymous shipping address options
+- [ ] explore implementing a trust metric to mitigate Sybil-attacks
