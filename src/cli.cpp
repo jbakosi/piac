@@ -114,6 +114,21 @@ usage( const std::string& logfile )
 
 } // piac::
 
+
+void echo_connection( const std::string& info, const std::string server )
+// *****************************************************************************
+//! \Echo connection information to screen
+//! \param[in] info Introductory info message about connection
+//! \param[in] server Hostname that will be addressed
+// *****************************************************************************
+{
+  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
+  std::cout << info << " at ";
+  epee::set_console_color( epee::console_color_white, /* bright = */ false );
+  std::cout << server << '\n';
+  epee::set_console_color( epee::console_color_default, /* bright = */ false );
+}
+
 int
 main( int argc, char **argv )
 // *****************************************************************************
@@ -292,15 +307,13 @@ main( int argc, char **argv )
 
   MINFO( "Command line: " + cmdline.str() );
 
-  std::string host = "localhost:55090";
-  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << "Will connect to piac daemon at " << host << '\n';
-  epee::set_console_color( epee::console_color_default, /* bright = */ false );
-
+  std::string piac_host = "localhost:55090";
   std::string monerod_host = "localhost:38089";
-  epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << "Wallet connecting to monero daemon at " << monerod_host << '\n';
-  epee::set_console_color( epee::console_color_default, /* bright = */ false );
+  std::string matrix_host = "matrix.org:443";
+
+  echo_connection( "Will connect to piac daemon", piac_host );
+  echo_connection( "Will connect to matrix server", matrix_host );
+  echo_connection( "Wallet connecting to monero daemon", monerod_host );
 
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
@@ -367,8 +380,8 @@ main( int argc, char **argv )
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
-      piac::send_cmd( buf, ctx, host, rpc_server_public_key, rpc_client_keys,
-                      wallet );
+      piac::send_cmd( buf, ctx, piac_host, rpc_server_public_key,
+                      rpc_client_keys,  wallet );
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
@@ -396,12 +409,20 @@ main( int argc, char **argv )
       "                This help message\n\n"
       "      keys\n"
       "                Show monero wallet keys of current user\n\n"
+      "      matrix  [<host>[:<port>]]\n"
+      "                Specify matrix server to connect to. The <host> argument specifies\n"
+      "                a hostname or an IPv4 address in standard dot notation. The\n"
+      "                optional <port> argument is an integer specifying a port. The\n"
+      "                default is " + matrix_host + ". Without an argument, show current\n"
+      "                setting. Use 'matrix \"\"' to clear the setting and disable\n"
+      "                communication via the built-in matrix client.\n\n"
       "      monerod [<host>[:<port>]]\n"
       "                Specify monero node to connect to. The <host> argument specifies\n"
       "                a hostname or an IPv4 address in standard dot notation. The\n"
       "                optional <port> argument is an integer specifying a port. The\n"
       "                default is " + monerod_host + ". Without an argument, show current\n"
-      "                setting. Use "" to clear the setting and use an offline wallet.\n\n"
+      "                setting. Use 'monerod \"\"' to clear the setting and use an\n"
+      "                offline wallet.\n\n"
       "      new\n"
       "                Create new user identity. This will generate a new monero wallet\n"
       "                which will be used as a user id when creating an ad or paying for\n"
@@ -413,10 +434,11 @@ main( int argc, char **argv )
       "                Specify server to send commands to. The <host> argument specifies\n"
       "                a hostname or an IPv4 address in standard dot notation. The\n"
       "                optional <port> argument is an integer specifying a port. The\n"
-      "                default is " + host + ". The optional public-key is the\n"
+      "                default is " + piac_host + ". The optional public-key is the\n"
       "                server's public key to use for authenticated and secure\n"
-      "                connections. Without an argument, show current setting. Use "" to\n"
-      "                clear the setting and use " + piac::cli_executable() + " offline.\n\n"
+      "                connections. Without an argument, show current setting. Use\n"
+      "                'server \"\"' to clear the setting and to not communicate with\n"
+      "                the peer-to-peer piac network.\n\n"
       "      user [<mnemonic>]\n"
       "                Show active monero wallet mnemonic seed (user id) if no mnemonic is\n"
       "                given. Switch to mnemonic if given.\n\n"
@@ -426,6 +448,28 @@ main( int argc, char **argv )
     } else if (!strcmp(buf,"keys")) {
 
       piac::show_wallet_keys( wallet );
+
+    } else if (buf[0]=='m' && buf[1]=='a' && buf[2]=='t' && buf[3]=='r'&&
+               buf[4]=='i' && buf[5]=='x') {
+
+      std::string b( buf );
+      auto t = piac::tokenize( b );
+      epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
+      if (t.size() == 1) {
+        if (matrix_host.empty())
+          std::cout << "No matrix server configured\n";
+        else
+          echo_connection( "Will connect to matrix server", matrix_host );
+      } else {
+        matrix_host = t[1];
+        if (matrix_host == "\"\"") {
+          matrix_host.clear();
+          std::cout << "Offline\n";
+        } else {
+          echo_connection( "Will connect to matrix server", matrix_host );
+        }
+      }
+      epee::set_console_color( epee::console_color_default, /*bright=*/ false );
 
     } else if (buf[0]=='m' && buf[1]=='o' && buf[2]=='n' && buf[3]=='e'&&
                buf[4]=='r' && buf[5]=='o' && buf[6]=='d') {
@@ -437,16 +481,14 @@ main( int argc, char **argv )
         if (monerod_host.empty())
           std::cout << "Wallet offline\n";
         else
-          std::cout << "Wallet connecting to monero daemon at "
-                    << monerod_host << '\n';
+          echo_connection( "Wallet connecting to monero daemon", monerod_host );
       } else {
         monerod_host = t[1];
         if (monerod_host == "\"\"") {
           monerod_host.clear();
           std::cout << "Offline\n";
         } else {
-          std::cout << "Wallet connecting to monero daemon at "
-                    << monerod_host << '\n';
+          echo_connection( "Wallet connecting to monero daemon", monerod_host );
         }
       }
       epee::set_console_color( epee::console_color_default, /*bright=*/ false );
@@ -457,7 +499,7 @@ main( int argc, char **argv )
 
     } else if (!strcmp(buf,"peers")) {
 
-      piac::send_cmd( "peers", ctx, host, rpc_server_public_key,
+      piac::send_cmd( "peers", ctx, piac_host, rpc_server_public_key,
                       rpc_client_keys, wallet );
 
     } else if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
@@ -467,17 +509,17 @@ main( int argc, char **argv )
       auto t = piac::tokenize( b );
       epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
       if (t.size() == 1) {
-        if (host.empty())
+        if (piac_host.empty())
           std::cout << "Offline\n";
         else
-          std::cout << "Will connect to piac daemon at " << host << '\n';
+         echo_connection( "Will connect to piac daemon", piac_host );
       } else {
-        host = t[1];
-        if (host == "\"\"") {
-          host.clear();
+        piac_host = t[1];
+        if (piac_host == "\"\"") {
+          piac_host.clear();
           std::cout << "Offline\n";
         } else {
-          std::cout << "Will connect to piac daemon at " << host;
+          echo_connection( "Will connect to piac daemon", piac_host );
           if (t.size() > 2) {
             std::cout << ", using public key: " << t[2];
             rpc_server_public_key = t[2];
