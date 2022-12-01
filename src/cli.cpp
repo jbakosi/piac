@@ -112,10 +112,8 @@ usage( const std::string& logfile )
          "         Show version information\n\n";
 }
 
-} // piac::
-
-
-void echo_connection( const std::string& info, const std::string server )
+static void
+echo_connection( const std::string& info, const std::string server )
 // *****************************************************************************
 //! \Echo connection information to screen
 //! \param[in] info Introductory info message about connection
@@ -128,6 +126,8 @@ void echo_connection( const std::string& info, const std::string server )
   std::cout << server << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
 }
+
+} // piac::
 
 int
 main( int argc, char **argv )
@@ -311,9 +311,9 @@ main( int argc, char **argv )
   std::string monerod_host = "localhost:38089";
   std::string matrix_host = "matrix.org:443";
 
-  echo_connection( "Will connect to piac daemon", piac_host );
-  echo_connection( "Will connect to matrix server", matrix_host );
-  echo_connection( "Wallet connecting to monero daemon", monerod_host );
+  piac::echo_connection( "Will connect to piac daemon", piac_host );
+  piac::echo_connection( "Will connect to matrix server", matrix_host );
+  piac::echo_connection( "Wallet connecting to monero daemon", monerod_host );
 
   // monero wallet = user id
   std::unique_ptr< monero_wallet_full > wallet;
@@ -459,14 +459,14 @@ main( int argc, char **argv )
         if (matrix_host.empty())
           std::cout << "No matrix server configured\n";
         else
-          echo_connection( "Will connect to matrix server", matrix_host );
+          piac::echo_connection( "Will connect to matrix server", matrix_host );
       } else {
         matrix_host = t[1];
         if (matrix_host == "\"\"") {
           matrix_host.clear();
           std::cout << "Offline\n";
         } else {
-          echo_connection( "Will connect to matrix server", matrix_host );
+          piac::echo_connection( "Will connect to matrix server", matrix_host );
         }
       }
       epee::set_console_color( epee::console_color_default, /*bright=*/ false );
@@ -478,17 +478,20 @@ main( int argc, char **argv )
       auto t = piac::tokenize( b );
       epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
       if (t.size() == 1) {
-        if (monerod_host.empty())
+        if (monerod_host.empty()) {
           std::cout << "Wallet offline\n";
-        else
-          echo_connection( "Wallet connecting to monero daemon", monerod_host );
+        } else {
+          piac::echo_connection( "Wallet connecting to monero daemon",
+                                 monerod_host );
+        }
       } else {
         monerod_host = t[1];
         if (monerod_host == "\"\"") {
           monerod_host.clear();
           std::cout << "Offline\n";
         } else {
-          echo_connection( "Wallet connecting to monero daemon", monerod_host );
+          piac::echo_connection( "Wallet connecting to monero daemon",
+                                 monerod_host );
         }
       }
       epee::set_console_color( epee::console_color_default, /*bright=*/ false );
@@ -509,17 +512,18 @@ main( int argc, char **argv )
       auto t = piac::tokenize( b );
       epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
       if (t.size() == 1) {
-        if (piac_host.empty())
+        if (piac_host.empty()) {
           std::cout << "Offline\n";
-        else
-         echo_connection( "Will connect to piac daemon", piac_host );
+        } else {
+         piac::echo_connection( "Will connect to piac daemon", piac_host );
+        }
       } else {
         piac_host = t[1];
         if (piac_host == "\"\"") {
           piac_host.clear();
           std::cout << "Offline\n";
         } else {
-          echo_connection( "Will connect to piac daemon", piac_host );
+          piac::echo_connection( "Will connect to piac daemon", piac_host );
           if (t.size() > 2) {
             std::cout << ", using public key: " << t[2];
             rpc_server_public_key = t[2];
