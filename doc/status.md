@@ -44,6 +44,7 @@ Here is a todo list in no particular order:
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
 - [ ] add messaging between users via matrix (WIP)
 - [ ] allow user to save other users in addressbook (matrixuser + monero address)
+- [ ] add user's bio (e.g., external contact info) and make it searchable
 - [x] allow connecting to local monero node
 - [ ] allow connecting to remote monero node (WIP)
 - [ ] allow running local monero node
