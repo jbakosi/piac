@@ -35,7 +35,7 @@ cd build && ctest
 
 ## Build with ninja instead of make
 
-You can also pass `-GNinja` to _both_ cmake calls:
+You can also pass `-GNinja` to either or both cmake calls:
 
 ```sh
 # build external libraries
