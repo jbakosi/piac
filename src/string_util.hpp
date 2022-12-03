@@ -6,11 +6,21 @@
   \brief     Piac string utilities
 */
 // *****************************************************************************
-
 #pragma once
+
+#include "macro.hpp"
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
+#endif
 
 #include <string>
 #include <vector>
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
 
 namespace piac {
 

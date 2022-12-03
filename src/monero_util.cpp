@@ -12,6 +12,20 @@
 #include "monero_util.hpp"
 
 void
+piac::WalletListener::on_sync_progress( uint64_t height,
+                                        uint64_t start_height,
+                                        uint64_t end_height,
+                                        double percent_done,
+                                        const std::string& message )
+{
+  m_height = height;
+  m_start_height = start_height;
+  m_end_height = end_height;
+  m_percent_done = percent_done;
+  m_message = message;
+}
+
+void
 piac::send_cmd( std::string cmd,
                 zmqpp::context& ctx,
                 const std::string& host,

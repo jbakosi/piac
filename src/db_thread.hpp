@@ -35,6 +35,10 @@
 
 namespace piac {
 
+extern std::mutex g_hashes_mtx;
+extern std::condition_variable g_hashes_cv;
+extern bool g_hashes_access;
+
 //! Update advertisement database hashes
 void
 db_update_hashes( const std::string& db_name,

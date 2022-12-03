@@ -80,14 +80,7 @@ class WalletListener : public monero::monero_wallet_listener {
 
     void on_sync_progress( uint64_t height, uint64_t start_height,
                            uint64_t end_height, double percent_done,
-                           const std::string& message ) override
-    {
-      m_height = height;
-      m_start_height = start_height;
-      m_end_height = end_height;
-      m_percent_done = percent_done;
-      m_message = message;
-    }
+                           const std::string& message ) override;
 
     virtual ~WalletListener() = default;
     uint64_t height() const { return m_height; }

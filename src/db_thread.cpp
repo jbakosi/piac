@@ -16,14 +16,6 @@
 #include "zmq_util.hpp"
 #include "db_thread.hpp"
 
-namespace piac {
-
-extern std::mutex g_hashes_mtx;
-extern std::condition_variable g_hashes_cv;
-extern bool g_hashes_access;
-
-} // piac::
-
 void
 piac::db_update_hashes( const std::string& db_name,
                         std::unordered_set< std::string >& my_hashes )
