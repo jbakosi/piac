@@ -130,3 +130,21 @@ ExternalProject_Add(
   LOG_DOWNLOAD 1
   LOG_INSTALL 1
 )
+
+# mtxclient
+ExternalProject_Add(
+  mtxclient
+  PREFIX mtxclient
+  GIT_REPOSITORY https://github.com/Nheko-Reborn/mtxclient.git
+  GIT_TAG v0.8.2
+  GIT_SHALLOW 1
+  CMAKE_ARGS -D CMAKE_C_COMPILER:PATH=${CMAKE_C_COMPILER}
+             -D CMAKE_CXX_COMPILER:PATH=${CMAKE_CXX_COMPILER}
+             -D CMAKE_BUILD_TYPE:PATH=${CMAKE_BUILD_TYPE}
+             -D BUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
+             -D CMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+             -D USE_BUNDLED_COEURL=true
+  LOG_DOWNLOAD 1
+  LOG_CONFIGURE 1
+  LOG_BUILD 1
+)

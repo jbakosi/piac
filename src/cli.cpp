@@ -11,12 +11,62 @@
 #include <readline/readline.h>
 #include <getopt.h>
 
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
+#endif
+
+#include <thread>
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #include "macro.hpp"
 #include "project_config.hpp"
 #include "string_util.hpp"
 #include "logging_util.hpp"
 #include "zmq_util.hpp"
 #include "monero_util.hpp"
+#include "matrix_thread.hpp"
+
+static std::unique_ptr< monero_wallet_full > g_wallet;
+static std::vector< std::thread > g_threads;
+
+static void graceful_exit() {
+  MDEBUG( "graceful exit" );
+  g_wallet.release();
+  if (piac::g_matrix_connected) {
+    piac::g_matrix_shutdown = true;
+    std::cout << "Waiting for matrix thread to quit ...\n";
+    g_threads[0].join();
+    g_threads.pop_back();
+  }
+}
+
+[[noreturn]] static void s_signal_handler( int /*signal_value*/ ) {
+  MDEBUG( "interrupted" );
+  graceful_exit();
+  exit( EXIT_SUCCESS );
+}
+
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
+
+static void s_catch_signals() {
+  struct sigaction action;
+  action.sa_handler = s_signal_handler;
+  action.sa_flags = 0;
+  sigemptyset( &action.sa_mask );
+  sigaction( SIGINT, &action, nullptr );
+  sigaction( SIGTERM, &action, nullptr );
+}
+
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
 
 //! Piac declarations and definitions
 namespace piac {
@@ -113,15 +163,15 @@ usage( const std::string& logfile )
 }
 
 static void
-echo_connection( const std::string& info, const std::string server )
+echo_connection( const std::string& info, const std::string& server )
 // *****************************************************************************
-//! \Echo connection information to screen
+//!  Echo connection information to screen
 //! \param[in] info Introductory info message about connection
 //! \param[in] server Hostname that will be addressed
 // *****************************************************************************
 {
   epee::set_console_color( epee::console_color_yellow, /* bright = */ false );
-  std::cout << info << " at ";
+  std::cout << info;
   epee::set_console_color( epee::console_color_white, /* bright = */ false );
   std::cout << server << '\n';
   epee::set_console_color( epee::console_color_default, /* bright = */ false );
@@ -309,14 +359,11 @@ main( int argc, char **argv )
 
   std::string piac_host = "localhost:55090";
   std::string monerod_host = "localhost:38089";
-  std::string matrix_host = "matrix.org:443";
 
-  piac::echo_connection( "Will connect to piac daemon", piac_host );
-  piac::echo_connection( "Will connect to matrix server", matrix_host );
-  piac::echo_connection( "Wallet connecting to monero daemon", monerod_host );
+  piac::echo_connection( "Will connect to piac daemon at ", piac_host );
+  piac::echo_connection( "Wallet connecting to monero daemon at ",
+                         monerod_host );
 
-  // monero wallet = user id
-  std::unique_ptr< monero_wallet_full > wallet;
   piac::WalletListener listener;
 
   MLOG_SET_THREAD_NAME( "cli" );
@@ -365,6 +412,8 @@ main( int argc, char **argv )
   epee::set_console_color( epee::console_color_default, /* bright = */false );
   MINFO( "RPC client public key: " << rpc_client_keys.public_key );
 
+  std::string matrix_host, matrix_user, matrix_password;
+
   // initialize (thread-safe) zmq context
   zmqpp::context ctx;
 
@@ -372,20 +421,21 @@ main( int argc, char **argv )
   std::string prompt = color_string( "piac", piac::GREEN ) +
                        color_string( "> ", piac::YELLOW );
 
+  s_catch_signals();
+
   while ((buf = readline( prompt.c_str() ) ) != nullptr) {
 
     if (!strcmp(buf,"balance")) {
 
-      piac::show_wallet_balance( wallet, listener );
+      piac::show_wallet_balance( g_wallet, listener );
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
       piac::send_cmd( buf, ctx, piac_host, rpc_server_public_key,
-                      rpc_client_keys,  wallet );
+                      rpc_client_keys, g_wallet );
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
 
-      wallet.release();
       break;
 
     } else if (!strcmp(buf,"help")) {
@@ -409,13 +459,18 @@ main( int argc, char **argv )
       "                This help message\n\n"
       "      keys\n"
       "                Show monero wallet keys of current user\n\n"
-      "      matrix  [<host>[:<port>]]\n"
-      "                Specify matrix server to connect to. The <host> argument specifies\n"
-      "                a hostname or an IPv4 address in standard dot notation. The\n"
-      "                optional <port> argument is an integer specifying a port. The\n"
-      "                default is " + matrix_host + ". Without an argument, show current\n"
-      "                setting. Use 'matrix \"\"' to clear the setting and disable\n"
-      "                communication via the built-in matrix client.\n\n"
+      "      matrix <host>[:<port>] <username> <password>]\n"
+      "                Specify matrix server login information to connect to. The <host>\n"
+      "                argument specifies a hostname or an IPv4 address in standard dot\n"
+      "                notation. The optional <port> argument is an integer specifying a\n"
+      "                port. If unspecified, the default port is 443. The <host>[:<port>]\n"
+      "                argument must be followed by <username> and <password>. Use\n"
+      "                'matrix \"\"' to clear the setting and disable communication via the\n"
+      "                built-in matrix client. Note that connecting to a matrix server also\n"
+      "                requires an active user id, see also 'new' or 'user'.\n\n"
+      "      msg <user> <message>\n"
+      "                Send a message to user, where <user> is a matrix user id and message\n"
+      "                is either a single word or a doubly-quoted multi-word message.\n\n"
       "      monerod [<host>[:<port>]]\n"
       "                Specify monero node to connect to. The <host> argument specifies\n"
       "                a hostname or an IPv4 address in standard dot notation. The\n"
@@ -447,29 +502,53 @@ main( int argc, char **argv )
 
     } else if (!strcmp(buf,"keys")) {
 
-      piac::show_wallet_keys( wallet );
+      piac::show_wallet_keys( g_wallet );
 
-    } else if (buf[0]=='m' && buf[1]=='a' && buf[2]=='t' && buf[3]=='r'&&
+    } else if (buf[0]=='m' && buf[1]=='s' && buf[2]=='g') {
+
+      //piac::matrix_message( matrix_user, buf );
+
+    } else if (buf[0]=='m' && buf[1]=='a' && buf[2]=='t' && buf[3]=='r' &&
                buf[4]=='i' && buf[5]=='x') {
 
+      if (not g_wallet) {
+        std::cerr << "Need active user id (wallet). See 'new' or 'user'.\n";
+      }
       std::string b( buf );
       auto t = piac::tokenize( b );
-      epee::set_console_color( epee::console_color_yellow, /*bright=*/ false );
       if (t.size() == 1) {
-        if (matrix_host.empty())
-          std::cout << "No matrix server configured\n";
-        else
-          piac::echo_connection( "Will connect to matrix server", matrix_host );
-      } else {
+        if (piac::g_matrix_connected) {
+          piac::echo_connection( "Connected to matrix server as ",
+                                 '@' + matrix_user + ':' + matrix_host );
+        } else {
+          std::cout << "Offline\n";
+        }
+      } else if (t.size() == 2) {
         matrix_host = t[1];
-        if (matrix_host == "\"\"") {
+        if (matrix_host == "disconnect") {
+          if (piac::g_matrix_connected) {
+            piac::g_matrix_shutdown = true;
+            std::cout << "Waiting for matrix thread to quit...\n";
+            g_threads[0].join();
+            g_threads.pop_back();
+            std::cout << "Disconnected\n";
+          }
+        } else if (matrix_host == "\"\"") {
           matrix_host.clear();
           std::cout << "Offline\n";
-        } else {
-          piac::echo_connection( "Will connect to matrix server", matrix_host );
         }
+      } else if (t.size() == 4) {
+        matrix_host = t[1];
+        matrix_user = t[2];
+        matrix_password = t[3];
+        piac::echo_connection( "Connecting to matrix server as ",
+                               '@' + matrix_user + ':' + matrix_host );
+        g_threads.emplace_back( piac::matrix_thread, matrix_host, matrix_user,
+          matrix_password, g_wallet->get_private_spend_key() );
+      } else {
+        std::cout << "The command 'matrix' must be followed by 3 arguments "
+                     "separated by spaces. See 'help'.\n";
       }
-      epee::set_console_color( epee::console_color_default, /*bright=*/ false );
 
     } else if (buf[0]=='m' && buf[1]=='o' && buf[2]=='n' && buf[3]=='e'&&
                buf[4]=='r' && buf[5]=='o' && buf[6]=='d') {
@@ -481,16 +560,16 @@ main( int argc, char **argv )
         if (monerod_host.empty()) {
           std::cout << "Wallet offline\n";
         } else {
-          piac::echo_connection( "Wallet connecting to monero daemon",
+          piac::echo_connection( "Wallet connecting to monero daemon at ",
                                  monerod_host );
         }
       } else {
         monerod_host = t[1];
         if (monerod_host == "\"\"") {
           monerod_host.clear();
-          std::cout << "Offline\n";
+          std::cout << "Wallet will not connect to monero daemon\n";
         } else {
-          piac::echo_connection( "Wallet connecting to monero daemon",
+          piac::echo_connection( "Wallet connecting to monero daemon at ",
                                  monerod_host );
         }
       }
@@ -498,12 +577,12 @@ main( int argc, char **argv )
 
     } else if (!strcmp(buf,"new")) {
 
-      wallet = piac::create_wallet( monerod_host, listener );
+      g_wallet = piac::create_wallet( monerod_host, listener );
 
     } else if (!strcmp(buf,"peers")) {
 
       piac::send_cmd( "peers", ctx, piac_host, rpc_server_public_key,
-                      rpc_client_keys, wallet );
+                      rpc_client_keys, g_wallet );
 
     } else if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
                buf[4]=='e' && buf[5]=='r') {
@@ -515,7 +594,7 @@ main( int argc, char **argv )
         if (piac_host.empty()) {
           std::cout << "Offline\n";
         } else {
-         piac::echo_connection( "Will connect to piac daemon", piac_host );
+         piac::echo_connection( "Will connect to piac daemon at ", piac_host );
         }
       } else {
         piac_host = t[1];
@@ -523,7 +602,7 @@ main( int argc, char **argv )
           piac_host.clear();
           std::cout << "Offline\n";
         } else {
-          piac::echo_connection( "Will connect to piac daemon", piac_host );
+          piac::echo_connection( "Will connect to piac daemon at ", piac_host );
           if (t.size() > 2) {
             std::cout << ", using public key: " << t[2];
             rpc_server_public_key = t[2];
@@ -538,11 +617,11 @@ main( int argc, char **argv )
       std::string mnemonic( buf );
       mnemonic.erase( 0, 5 );
       if (mnemonic.empty()) {
-        piac::show_user( wallet );
+        piac::show_user( g_wallet );
       } else if (piac::wordcount(mnemonic) != 25) {
         std::cout << "Need 25 words\n";
       } else {
-        wallet = piac::switch_user( mnemonic, monerod_host, listener );
+        g_wallet = piac::switch_user( mnemonic, monerod_host, listener );
       }
 
     } else if (!strcmp(buf,"version")) {
@@ -561,7 +640,6 @@ main( int argc, char **argv )
     if (buf) free( buf );
   }
 
-  MDEBUG( "graceful exit" );
-
+  graceful_exit();
   return EXIT_SUCCESS;
 }

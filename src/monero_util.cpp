@@ -82,7 +82,7 @@ piac::start_syncing( const std::string& msg,
     wallet->add_listener( listener );
     wallet->start_syncing( /* sync period in ms = */ 10000 );
   } else {
-    std::cout << ", no connection to monero daemon, see 'monerod'\n";
+    std::cout << ", no connection to monero daemon\n";
   }
 }
 

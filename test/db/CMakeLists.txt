@@ -2,12 +2,12 @@
 
 # start daemon in background, run cli tests, kill daemon
 add_test(NAME daemon_db_detach COMMAND ${DAEMON_EXECUTABLE}
-         --detach --rpc-bind-port 55092 --p2p-bind-port 65092)
+         --detach --rpc-bind-port 55093 --p2p-bind-port 65092)
 set_tests_properties(daemon_db_detach PROPERTIES
                      PASS_REGULAR_EXPRESSION "Forked PID"
                      LABELS "db")
 
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55092" _in)
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.connect.55093" _in)
 add_test(NAME cli_db_connect
          COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> < ${_in}")
 set_tests_properties(cli_db_connect PROPERTIES

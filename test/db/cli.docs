@@ -1,3 +1,3 @@
-server localhost:55092
+server localhost:55093
 db list
 exit

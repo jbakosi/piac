@@ -131,6 +131,17 @@ find_package(cryptopp REQUIRED)
 # Find OpenSSL
 find_package(OpenSSL REQUIRED)
 
+# Find mtxclient
+find_package(coeurl CONFIG)
+find_package(spdlog 1.0.0 CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
+pkg_check_modules(libevent_core REQUIRED IMPORTED_TARGET libevent_core)
+pkg_check_modules(libevent_pthreads REQUIRED IMPORTED_TARGET libevent_pthreads)
+find_package(Olm 3.2.7 REQUIRED)
+find_package(nlohmann_json 3.2.0)
+find_package(MatrixClient REQUIRED)
+
 # Find Python: required for code coverage (fastcov) and doc (m.css)
 find_package(PythonInterp 3.6)
 
@@ -245,6 +256,16 @@ install(TARGETS db_thread
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
+add_library(matrix_thread ${PIAC_SOURCE_DIR}/matrix_thread.cpp)
+target_include_directories(matrix_thread PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${TPL_DIR}/include)
+set_target_properties(matrix_thread PROPERTIES LIBRARY_OUTPUT_NAME
+                      piac_matrix_thread)
+install(TARGETS matrix_thread
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
@@ -286,6 +307,7 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
+                      matrix_thread
                       logging_util
                       string_util
                       monero_util
@@ -297,6 +319,7 @@ target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       ${OPENSSL_CRYPTO_LIBRARIES}
                       ${EASYLOGGINGPP_LIBRARIES}
                       ${MONEROCPP_LIBRARIES}
+                      MatrixClient::MatrixClient
                       cryptopp::cryptopp
                       Threads::Threads)
 install(TARGETS ${CLI_EXECUTABLE}

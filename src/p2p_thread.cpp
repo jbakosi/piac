@@ -311,8 +311,8 @@ piac::p2p_thread( zmqpp::context& ctx_p2p,
 //! \param[in] use_strict_ports True to try only the default port
 // *****************************************************************************
 {
-  MLOG_SET_THREAD_NAME( "rpc" );
-  MINFO( "rpc thread initialized" );
+  MLOG_SET_THREAD_NAME( "p2p" );
+  MINFO( "p2p thread initialized" );
 
   // create socket that will listen to peers and bind to p2p port
   zmqpp::socket router( ctx_p2p, zmqpp::socket_type::router );
