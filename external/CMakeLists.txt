@@ -51,10 +51,6 @@ set(PIAC_CMAKE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
 
 # monero
 set(MONERO_PATCH_COMMAND "patch;-p1;-t;-i;${PIAC_CMAKE_PATH}/monero-install-targets.patch")
-if (HOST_OS MATCHES "alpine")
-  set(MONERO_ALPINE_DISABLE_STACK_TRACE "-D STACK_TRACE:BOOL=OFF")
-  list(APPEND MONERO_PATCH_COMMAND "&&;patch;-p1;-t;-i;${PIAC_CMAKE_PATH}/monero-alpine-easylogging.patch")
-endif()
 ExternalProject_Add(
   monero
   PREFIX monero
@@ -71,8 +67,10 @@ ExternalProject_Add(
      -D BUILD_GUI_DEPS:BOOL=true
      ${MONERO_ALPINE_DISABLE_STACK_TRACE}
   LOG_DOWNLOAD 1
+  LOG_PATCH 1
   LOG_CONFIGURE 1
   LOG_BUILD 1
+  LOG_INSTALL 1
 )
 
 # monero-cpp
@@ -96,6 +94,7 @@ ExternalProject_Add(
   LOG_DOWNLOAD 1
   LOG_CONFIGURE 1
   LOG_BUILD 1
+  LOG_INSTALL 1
 )
 
 # zmqpp
@@ -114,6 +113,7 @@ ExternalProject_Add(
   LOG_DOWNLOAD 1
   LOG_CONFIGURE 1
   LOG_BUILD 1
+  LOG_INSTALL 1
 )
 
 # mcss
@@ -141,10 +141,11 @@ ExternalProject_Add(
   CMAKE_ARGS -D CMAKE_C_COMPILER:PATH=${CMAKE_C_COMPILER}
              -D CMAKE_CXX_COMPILER:PATH=${CMAKE_CXX_COMPILER}
              -D CMAKE_BUILD_TYPE:PATH=${CMAKE_BUILD_TYPE}
-             -D BUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
+             -D BUILD_SHARED_LIBS:BOOL=false
              -D CMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
              -D USE_BUNDLED_COEURL=true
   LOG_DOWNLOAD 1
   LOG_CONFIGURE 1
   LOG_BUILD 1
+  LOG_INSTALL 1
 )

@@ -132,14 +132,14 @@ find_package(cryptopp REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # Find mtxclient
-find_package(coeurl CONFIG)
+find_package(coeurl REQUIRED)
 find_package(spdlog 1.0.0 CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libcurl REQUIRED IMPORTED_TARGET libcurl)
 pkg_check_modules(libevent_core REQUIRED IMPORTED_TARGET libevent_core)
 pkg_check_modules(libevent_pthreads REQUIRED IMPORTED_TARGET libevent_pthreads)
 find_package(Olm 3.2.7 REQUIRED)
-find_package(nlohmann_json 3.2.0)
+find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(MatrixClient REQUIRED)
 
 # Find Python: required for code coverage (fastcov) and doc (m.css)
