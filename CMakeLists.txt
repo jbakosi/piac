@@ -269,6 +269,17 @@ install(TARGETS cli_matrix_thread
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
+add_library(cli_message_thread ${PIAC_SOURCE_DIR}/cli_message_thread.cpp)
+target_include_directories(cli_message_thread PUBLIC
+                           ${PIAC_SOURCE_DIR}
+                           ${TPL_DIR}/include)
+set_target_properties(cli_message_thread PROPERTIES LIBRARY_OUTPUT_NAME
+                      piac_cli_message_thread)
+install(TARGETS cli_message_thread
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
+
 # configure piac daemon executable
 set(DAEMON_EXECUTABLE "piac-daemon")
 add_executable(${DAEMON_EXECUTABLE}
@@ -310,6 +321,7 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
                       cli_matrix_thread
+                      cli_message_thread
                       logging_util
                       string_util
                       monero_util

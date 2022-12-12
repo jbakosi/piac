@@ -3,7 +3,7 @@
   \file      src/cli_matrix_thread.cpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
-  \brief     Piac matrix client
+  \brief     Piac matrix client functionality
 */
 // *****************************************************************************
 
@@ -45,9 +45,11 @@ static std::shared_ptr< mtx::crypto::OlmClient> g_olmclient = nullptr;
 static std::string g_mtx_account_db_filename;
 static std::string g_mtx_session_db_filename;
 static std::string g_mtx_db_storage_key;
+static std::vector< zmqpp::socket > g_msg_mtx;
 
 bool piac::g_matrix_connected = false;
 bool piac::g_matrix_shutdown = false;
+zmqpp::context piac::g_ctx_msg;
 
 struct OutboundSessionData {
   std::string session_id;
@@ -901,6 +903,11 @@ parse_messages( const mtx::responses::Sync& res )
     }
 
   }
+
+  // tell the message thread that we have just parsed messages
+  zmqpp::message msg;
+  msg << "parsed_messages";
+  g_msg_mtx.back().send( msg );
 }
 
 static void
@@ -1037,6 +1044,7 @@ piac::matrix_thread( const std::string& server,
 //! \param[in] db_key Database key to use to encrypt session db on disk
 // *****************************************************************************
 {
+  MLOG_SET_THREAD_NAME( "mtx" );
   MINFO( "mtx thread initialized" );
   MDEBUG( "matrix login request to server: " << server << ", username: " <<
           username << ", connected: " << std::boolalpha << g_matrix_connected );
@@ -1081,11 +1089,22 @@ piac::matrix_thread( const std::string& server,
   }
   g_storage.load();
 
+  // create socket to forward matrix messages to
+  g_msg_mtx.emplace_back( piac::g_ctx_msg, zmqpp::socket_type::pair );
+  g_msg_mtx.back().connect( "inproc://msg_mtx" );
+  MDEBUG( "Connected to inproc:://msg_mtx" );
+
   g_matrix_connected = true;
-  g_mtxclient->login( username, password, login_cb );   // blocking
+  g_mtxclient->login( username, password, login_cb );   // blocking, syncing...
   g_mtxclient->close();
   g_matrix_connected = false;
   g_matrix_shutdown = false;
+
+  // tell the message thread that we are shutting down
+  zmqpp::message msg;
+  msg << "SHUTDOWN";
+  g_msg_mtx.back().send( msg );
+  g_msg_mtx.clear();
 
   MDEBUG( "saving matrix session to " +
           g_mtx_account_db_filename + " and " + g_mtx_session_db_filename );
@@ -1099,4 +1118,6 @@ piac::matrix_thread( const std::string& server,
   data[ "account" ] = g_olmclient->save( g_mtx_db_storage_key );
   odb << data.dump( 2 );
   odb.close();
+
+  MINFO( "mtx thread quit" );
 }

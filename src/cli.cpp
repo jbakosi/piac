@@ -7,20 +7,11 @@
 */
 // *****************************************************************************
 
+#include <thread>
+
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <getopt.h>
-
-#if defined(__clang__)
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
-#endif
-
-#include <thread>
-
-#if defined(__clang__)
-  #pragma clang diagnostic pop
-#endif
 
 #include "macro.hpp"
 #include "project_config.hpp"
@@ -29,6 +20,7 @@
 #include "zmq_util.hpp"
 #include "monero_util.hpp"
 #include "cli_matrix_thread.hpp"
+#include "cli_message_thread.hpp"
 
 static std::unique_ptr< monero_wallet_full > g_wallet;
 static std::vector< std::thread > g_threads;
@@ -39,8 +31,8 @@ static void graceful_exit() {
   if (piac::g_matrix_connected) {
     piac::g_matrix_shutdown = true;
     std::cout << "Waiting for matrix thread to quit ...\n";
-    g_threads[0].join();
-    g_threads.pop_back();
+    for (auto& t : g_threads) t.join();
+    g_threads.clear();
   }
 }
 
@@ -414,8 +406,8 @@ main( int argc, char **argv )
 
   std::string matrix_host, matrix_user, matrix_password;
 
-  // initialize (thread-safe) zmq context
-  zmqpp::context ctx;
+  // initialize (thread-safe) zmq context used to communicate with daemon
+  zmqpp::context ctx_rpc;
 
   char* buf;
   std::string prompt = color_string( "piac", piac::GREEN ) +
@@ -431,7 +423,7 @@ main( int argc, char **argv )
 
     } else if (buf[0]=='d' && buf[1]=='b') {
 
-      piac::send_cmd( buf, ctx, piac_host, rpc_server_public_key,
+      piac::send_cmd( buf, ctx_rpc, piac_host, rpc_server_public_key,
                       rpc_client_keys, g_wallet );
 
     } else if (!strcmp(buf,"exit") || !strcmp(buf,"quit") || buf[0]=='q') {
@@ -529,8 +521,8 @@ main( int argc, char **argv )
           if (piac::g_matrix_connected) {
             piac::g_matrix_shutdown = true;
             std::cout << "Waiting for matrix thread to quit...\n";
-            g_threads[0].join();
-            g_threads.pop_back();
+            for (auto& h : g_threads) h.join();
+            g_threads.clear();
             std::cout << "Disconnected\n";
           }
         } else if (matrix_host == "\"\"") {
@@ -545,6 +537,7 @@ main( int argc, char **argv )
                                '@' + matrix_user + ':' + matrix_host );
         g_threads.emplace_back( piac::matrix_thread, matrix_host, matrix_user,
           matrix_password, g_wallet->get_private_spend_key() );
+        g_threads.emplace_back( piac::message_thread );
       } else {
         std::cout << "The command 'matrix' must be followed by 3 arguments "
                      "separated by spaces. See 'help'.\n";
@@ -581,7 +574,7 @@ main( int argc, char **argv )
 
     } else if (!strcmp(buf,"peers")) {
 
-      piac::send_cmd( "peers", ctx, piac_host, rpc_server_public_key,
+      piac::send_cmd( "peers", ctx_rpc, piac_host, rpc_server_public_key,
                       rpc_client_keys, g_wallet );
 
     } else if (buf[0]=='s' && buf[1]=='e' && buf[2]=='r' && buf[3]=='v'&&
@@ -611,6 +604,19 @@ main( int argc, char **argv )
         }
       }
       epee::set_console_color( epee::console_color_default, /*bright=*/ false );
+
+    } else if (buf[0]=='s' && buf[1]=='l' && buf[2]=='e' && buf[3]=='e' &&
+               buf[4]=='p')
+    {
+
+      std::string sec( buf );
+      sec.erase( 0, 6 );
+
+      auto start = std::chrono::high_resolution_clock::now();
+      std::this_thread::sleep_for( std::chrono::seconds( std::atoi(sec.c_str()) ) );
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration< double, std::milli > elapsed = end - start;
+      MDEBUG( "Waited " << elapsed.count() << " ms" );
 
     } else if (buf[0]=='u' && buf[1]=='s' && buf[2]=='e' && buf[3]=='r') {
 
