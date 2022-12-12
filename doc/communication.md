@@ -164,23 +164,23 @@ zmq's [inproc](http://api.zeromq.org/master:zmq-inproc) transport using the
 [exclusive pair](http://api.zeromq.org/master:zmq-socket) socket pattern.
 
 ```
-                       |    /      |                       |    /      |
-                       |    \      |                       |    \      |
-                       |    \      |                       |    \      |
-                       |    /      |                       |    /      |
-  ___________          |    \      |                       |    \      |
- |           |         |    /      |                       |    /      |
- | MTXCLIENT |         |    \      |  PAIR           PAIR  |    \      |
- |    LIB    |  sync   |           | (connect)      (bind) |           |
-             ----------->   MTX   -------------------------->  MSG     |
- |           |         |  THREAD   |                       |  THREAD   |
- |____/|\____|         |           |                       |           |
-       |               |    \      |                       |    \      |
-       |               |    /      |                       |    /      |
-  ____ | ____          |    \      |                       |    \      |
- |    \|/    |         |    /      |                       |    /      |
- |           |         |    \      |                       |    \      |
- |  MATRIX   |         |    /      |                       |    /      |
+                       |    /    |                    |    /    |          |    /      |
+                       |    \    |                    |    \    |          |    \      |
+                       |    \    |                    |    \    |          |    \      |
+                       |    /    |                    |    /    |          |    /      |
+  ___________          |    \    |                    |    \    |          |    \      |
+ |           |         |    /    |                    |    /    |          |    /      |
+ | MTXCLIENT |         |    \    |  PAIR        PAIR  |    \    |          |    \      |
+ |    LIB    |  sync   |         | (connect)   (bind) |         |          |           |
+             ----------->   MTX  ---------------------->  MSG   ------------>  CLI     |
+ |           |         |  THREAD |                    |  THREAD |          |  THREAD   |
+ |____/|\____|         |         |                    |         |          |  (user)   |
+       |               |    \    |                    |    \    |          |           |
+       |               |    /    |                    |    /    |          |    /      |
+  ____ | ____          |    \    |                    |    \    |          |    \      |
+ |    \|/    |         |    /    |                    |    /    |          |    /      |
+ |           |         |    \    |                    |    \    |          |    \      |
+ |  MATRIX   |         |    /    |                    |    /    |          |    /      |
  |  SERVER   |
  |___________|
 ```
