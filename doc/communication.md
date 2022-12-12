@@ -114,8 +114,10 @@ default is attempted.
 
 ## Multi-threading and communication via ZMQ
 
-The daemon is threaded so it can use multiple CPU cores. At this time, there
-are two different threads
+### Daemon threads
+
+The daemon is threaded and it can use multiple CPU cores if available. There
+are two different threads, spawned after all initialization is complete:
 
 1. P2P, used to communicate with peers. (Source code associated with this
    thread is labeled by `p2p`)
@@ -143,3 +145,46 @@ zmq's [inproc](http://api.zeromq.org/master:zmq-inproc) transport using the
    |    /      |                              |    /      |
    |    \      |                              |    \      |
 ```
+
+### Command line interface client threads
+
+The command line interface client (cli) is also threaded and will use multiple
+CPU cores if available. There are two threads spawned when a user connects to a
+matrix server:
+
+1. MTX, interfacing with a matrix server to facilitate communication via the
+   matrix protocol. (Source code associated with this thread is labeled by
+   `mtx`)
+2. MSG, used to receive and store messages that the matrix client thread
+   receives via matrix. (Source code associated with this thread is labeled by
+   `msg`.)
+
+Communication between the mtx and msg threads is facilitated by
+zmq's [inproc](http://api.zeromq.org/master:zmq-inproc) transport using the
+[exclusive pair](http://api.zeromq.org/master:zmq-socket) socket pattern.
+
+```
+                       |    /      |                       |    /      |
+                       |    \      |                       |    \      |
+                       |    \      |                       |    \      |
+                       |    /      |                       |    /      |
+  ___________          |    \      |                       |    \      |
+ |           |         |    /      |                       |    /      |
+ | MTXCLIENT |         |    \      |  PAIR           PAIR  |    \      |
+ |    LIB    |  sync   |           | (connect)      (bind) |           |
+             ----------->   MTX   -------------------------->  MSG     |
+ |           |         |  THREAD   |                       |  THREAD   |
+ |____/|\____|         |           |                       |           |
+       |               |    \      |                       |    \      |
+       |               |    /      |                       |    /      |
+  ____ | ____          |    \      |                       |    \      |
+ |    \|/    |         |    /      |                       |    /      |
+ |           |         |    \      |                       |    \      |
+ |  MATRIX   |         |    /      |                       |    /      |
+ |  SERVER   |
+ |___________|
+```
+
+When the user disconnects from the matrix server, the threads are finished and
+recreated for a new matrix login. The threads are spawned and handled by the
+main CLI thread which interacts with the user.
