@@ -35,6 +35,7 @@
 
 #include "matrix_thread.hpp"
 #include "logging_util.hpp"
+#include "string_util.hpp"
 
 #define SYNC_TIMEOUT 5000   //  msecs, (> 1000!)
 
@@ -357,6 +358,8 @@ print_errors( mtx::http::RequestErr err )
     MERROR( "error msg: " << err->matrix_error.error );
   if (err->error_code)
     MERROR( "error code: " << err->error_code );
+  if (not err->parse_error.empty())
+    MERROR( "parse error: " << err->parse_error );
 }
 
 static void
@@ -1028,19 +1031,37 @@ piac::matrix_thread( const std::string& server,
                      const std::string& db_key )
 // *****************************************************************************
 //  Entry point to thread to communicate with a matrix server
-//! \param[in] server Matrix hostname to connect to
+//! \param[in] server Matrix hostname to connect to as <host>[:port]
 //! \param[in] username Username to use
 //! \param[in] password Password to use
 //! \param[in] db_key Database key to use to encrypt session db on disk
 // *****************************************************************************
 {
   MINFO( "mtx thread initialized" );
-  MDEBUG( "matrix login: server: " << server << ", username: " <<
+  MDEBUG( "matrix login request to server: " << server << ", username: " <<
           username << ", connected: " << std::boolalpha << g_matrix_connected );
 
-  if (g_matrix_connected) return;
+  if (g_matrix_connected) {
+    MDEBUG( "already connected" );
+    return;
+  }
 
-  g_mtxclient = std::make_shared< mtx::http::Client >( server );
+  int port = 443;
+  auto [host,prt] = split( server, ":" );
+  if (prt.empty()) {
+    g_mtxclient = std::make_shared< mtx::http::Client >( host );
+  } else {
+    try {
+      port = std::stoi( prt );
+    } catch (std::exception&) {
+      std::cerr << "invalid <host>:<port> format\n";
+      return;
+    }
+    g_mtxclient = std::make_shared< mtx::http::Client >( host, port );
+  }
+  MDEBUG( "will connect as @" << username << ':' << host << ':' << port );
+
+  g_mtxclient->verify_certificates( false );
   g_olmclient = std::make_shared< mtx::crypto::OlmClient >();
 
   std::string db_base_filename = "piac-matrix-@" + username + ':' + server;
@@ -1061,8 +1082,7 @@ piac::matrix_thread( const std::string& server,
   g_storage.load();
 
   g_matrix_connected = true;
-  g_mtxclient->login( username, password, login_cb );
-
+  g_mtxclient->login( username, password, login_cb );   // blocking
   g_mtxclient->close();
   g_matrix_connected = false;
   g_matrix_shutdown = false;

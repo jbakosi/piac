@@ -14,7 +14,7 @@
 void
 piac::trim( std::string& s )
 // ****************************************************************************
-// Trim a string to remove white space from front and back
+//  Trim a string to remove white space from front and back
 //! \param[in,out] s String to remove white spaces from
 // ****************************************************************************
 {
@@ -67,4 +67,17 @@ piac::wordcount( const std::string& s )
      ++str;
   }
   return numWords;
+}
+
+[[nodiscard]] std::pair< std::string, std::string >
+piac::split( std::string s, const std::string& delim )
+// ****************************************************************************
+//  Split string into two substrings at delimiter
+//! \param[in] s String to split
+//! \param[in] delim Delimiter at which to split
+// ****************************************************************************
+{
+  trim( s );
+  auto p = s.find_last_of( delim );
+  return { s.substr(0,p), p == std::string::npos ? "" : s.substr(p+1) };
 }

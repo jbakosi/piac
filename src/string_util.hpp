@@ -17,6 +17,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 #if defined(__clang__)
   #pragma clang diagnostic pop
@@ -28,9 +29,15 @@ namespace piac {
 void trim( std::string& s );
 
 //! Tokenize, i.e., break up, a string along white space into words
-[[nodiscard]] std::vector< std::string > tokenize( const std::string& s );
+[[nodiscard]] std::vector< std::string >
+tokenize( const std::string& s );
 
 //! Count the number of words in a string
-[[nodiscard]] int wordcount( const std::string& s );
+[[nodiscard]] int
+wordcount( const std::string& s );
+
+//! Split string into two substrings at delimiter
+[[nodiscard]] std::pair< std::string, std::string >
+split( std::string s, const std::string& delim );
 
 } // ::piac
