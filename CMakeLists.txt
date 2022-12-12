@@ -236,33 +236,35 @@ install(TARGETS monero_util
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
-add_library(p2p_thread ${PIAC_SOURCE_DIR}/p2p_thread.cpp)
-target_include_directories(p2p_thread PUBLIC
+add_library(daemon_p2p_thread ${PIAC_SOURCE_DIR}/daemon_p2p_thread.cpp)
+target_include_directories(daemon_p2p_thread PUBLIC
                            ${PIAC_SOURCE_DIR}
                            ${ZMQPP_INCLUDE_DIRS})
-set_target_properties(p2p_thread PROPERTIES LIBRARY_OUTPUT_NAME piac_p2p_thread)
-install(TARGETS p2p_thread
+set_target_properties(daemon_p2p_thread PROPERTIES
+                      LIBRARY_OUTPUT_NAME piac_daemon_p2p_thread)
+install(TARGETS daemon_p2p_thread
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
-add_library(db_thread ${PIAC_SOURCE_DIR}/db_thread.cpp)
-target_include_directories(db_thread PUBLIC
+add_library(daemon_db_thread ${PIAC_SOURCE_DIR}/daemon_db_thread.cpp)
+target_include_directories(daemon_db_thread PUBLIC
                            ${PIAC_SOURCE_DIR}
                            ${ZMQPP_INCLUDE_DIRS})
-set_target_properties(db_thread PROPERTIES LIBRARY_OUTPUT_NAME piac_db_thread)
-install(TARGETS db_thread
+set_target_properties(daemon_db_thread PROPERTIES
+                      LIBRARY_OUTPUT_NAME piac_daemon_db_thread)
+install(TARGETS daemon_db_thread
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
 
-add_library(matrix_thread ${PIAC_SOURCE_DIR}/matrix_thread.cpp)
-target_include_directories(matrix_thread PUBLIC
+add_library(cli_matrix_thread ${PIAC_SOURCE_DIR}/cli_matrix_thread.cpp)
+target_include_directories(cli_matrix_thread PUBLIC
                            ${PIAC_SOURCE_DIR}
                            ${TPL_DIR}/include)
-set_target_properties(matrix_thread PROPERTIES LIBRARY_OUTPUT_NAME
-                      piac_matrix_thread)
-install(TARGETS matrix_thread
+set_target_properties(cli_matrix_thread PROPERTIES LIBRARY_OUTPUT_NAME
+                      piac_cli_matrix_thread)
+install(TARGETS cli_matrix_thread
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
@@ -278,8 +280,8 @@ target_include_directories(${DAEMON_EXECUTABLE} PUBLIC
                            ${ZMQPP_INCLUDE_DIRS}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${DAEMON_EXECUTABLE}
-                      db_thread
-                      p2p_thread
+                      daemon_db_thread
+                      daemon_p2p_thread
                       db
                       document
                       logging_util
@@ -307,7 +309,7 @@ target_include_directories(${CLI_EXECUTABLE} PUBLIC
                            ${PIAC_SOURCE_DIR}
                            ${PROJECT_BINARY_DIR})
 target_link_libraries(${CLI_EXECUTABLE} PRIVATE
-                      matrix_thread
+                      cli_matrix_thread
                       logging_util
                       string_util
                       monero_util

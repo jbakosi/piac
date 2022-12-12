@@ -1,6 +1,6 @@
 // *****************************************************************************
 /*!
-  \file      src/db_thread.cpp
+  \file      src/daemon_db_thread.cpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac daemon interaction with database
@@ -14,7 +14,7 @@
 #include "logging_util.hpp"
 #include "crypto_util.hpp"
 #include "zmq_util.hpp"
-#include "db_thread.hpp"
+#include "daemon_db_thread.hpp"
 
 void
 piac::db_update_hashes( const std::string& db_name,

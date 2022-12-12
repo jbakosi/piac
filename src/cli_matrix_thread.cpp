@@ -1,6 +1,6 @@
 // *****************************************************************************
 /*!
-  \file      src/matrix_thread.cpp
+  \file      src/cli_matrix_thread.cpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac matrix client
@@ -33,7 +33,7 @@
   #pragma clang diagnostic pop
 #endif
 
-#include "matrix_thread.hpp"
+#include "cli_matrix_thread.hpp"
 #include "logging_util.hpp"
 #include "string_util.hpp"
 

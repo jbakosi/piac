@@ -1,6 +1,6 @@
 // *****************************************************************************
 /*!
-  \file      src/p2p_thread.cpp
+  \file      src/daemon_p2p_thread.cpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac daemon peer-to-peer communication
@@ -13,7 +13,7 @@
 #include "logging_util.hpp"
 #include "crypto_util.hpp"
 #include "zmq_util.hpp"
-#include "p2p_thread.hpp"
+#include "daemon_p2p_thread.hpp"
 
 namespace piac {
 

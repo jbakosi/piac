@@ -28,7 +28,7 @@
 #include "logging_util.hpp"
 #include "zmq_util.hpp"
 #include "monero_util.hpp"
-#include "matrix_thread.hpp"
+#include "cli_matrix_thread.hpp"
 
 static std::unique_ptr< monero_wallet_full > g_wallet;
 static std::vector< std::thread > g_threads;

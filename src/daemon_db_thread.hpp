@@ -1,6 +1,6 @@
 // *****************************************************************************
 /*!
-  \file      src/db_thread.hpp
+  \file      src/daemon_db_thread.hpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac daemon interaction with database

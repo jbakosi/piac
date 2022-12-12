@@ -1,6 +1,6 @@
 // *****************************************************************************
 /*!
-  \file      src/matrix_thread.hpp
+  \file      src/cli_matrix_thread.hpp
   \copyright 2022-2023 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac matrix client

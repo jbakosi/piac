@@ -19,8 +19,8 @@
 #include "macro.hpp"
 #include "project_config.hpp"
 #include "logging_util.hpp"
-#include "p2p_thread.hpp"
-#include "db_thread.hpp"
+#include "daemon_p2p_thread.hpp"
+#include "daemon_db_thread.hpp"
 
 [[noreturn]] static void s_signal_handler( int /*signal_value*/ ) {
   MDEBUG( "interrupted" );
