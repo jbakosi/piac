@@ -143,7 +143,7 @@ ExternalProject_Add(
              -D CMAKE_BUILD_TYPE:PATH=${CMAKE_BUILD_TYPE}
              -D BUILD_SHARED_LIBS:BOOL=false
              -D CMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
-             -D BUILD_LIB_TESTS=false
+             -D BUILD_LIB_TESTS:BOOL=false
              -D USE_BUNDLED_COEURL=true
   LOG_DOWNLOAD 1
   LOG_CONFIGURE 1
