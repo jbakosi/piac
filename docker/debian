@@ -31,12 +31,12 @@ RUN cd piac && git checkout $COMMIT && git log -1 HEAD
 RUN cd piac && mkdir -p external/build && cd external/build && cmake .. && make -sj$(grep -c processor /proc/cpuinfo)
 
 # Clean up
-#RUN rm -rf piac/external/build
+RUN rm -rf piac/external/build
 
 # The commands below can be used to build and test piac if anything
 # upstream is updated. After no error, they should be commented.
 
 # Build piac
-RUN cd piac && mkdir -p build && cd build && cmake .. && make -sj$(grep -c processor /proc/cpuinfo)
+#RUN cd piac && mkdir -p build && cd build && cmake .. && make -sj$(grep -c processor /proc/cpuinfo)
 # Run tests
-RUN cd piac/build && ctest -j$(grep -c processor /proc/cpuinfo)
+#RUN cd piac/build && ctest -j$(grep -c processor /proc/cpuinfo)
