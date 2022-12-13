@@ -10,13 +10,14 @@ if [[ "$1" == "start" ]]; then
   # start synapse
   mkdir -p data
   chmod 0777 data
-  docker run -v `pwd`/data:/data --rm -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no ${SYNAPSE_IMAGE} generate
+  docker run -v /var/run/docker.sock:/var/run/docker.sock -v `pwd`/data:/data --rm -e SYNAPSE_SERVER_NAME=localhost -e SYNAPSE_REPORT_STATS=no ${SYNAPSE_IMAGE} generate
   ./adjust-config.sh
   docker run -d \
          --name synapse \
          -p 443:8008 \
          -p 8448:8008 \
          -p 8008:8008 \
+         -v /var/run/docker.sock:/var/run/docker.sock \
          -v `pwd`/data:/data ${SYNAPSE_IMAGE}
   echo Waiting for synapse to start...
   until curl -s -f -k https://localhost:443/_matrix/client/versions; do echo "Checking ..."; sleep 2; done
