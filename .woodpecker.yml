@@ -2,6 +2,9 @@ services:
   synapse:
     image: jbakosi/piac-synapse
     #pull: true
+    when:
+      matrix:
+        COMPILER: gnu
 
 matrix:
   include:
