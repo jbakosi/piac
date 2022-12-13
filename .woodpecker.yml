@@ -7,8 +7,8 @@ matrix:
   include:
     - BUILDTYPE: Release
       COMPILER: gnu
-   - BUILDTYPE: Debug
-     COMPILER: clang
+    - BUILDTYPE: Debug
+      COMPILER: clang
 
 pipeline:
   build:
