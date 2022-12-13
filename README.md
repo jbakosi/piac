@@ -32,7 +32,7 @@ Join the discussion on [matrix](https://matrix.to/#/!GQOnNHAlHPcDKkYheV:matrix.o
 ## Build
 ```sh
 # Install system-wide prerequisites on Debian/Ubuntu Linux
-sudo apt-get install git cmake g++ clang pkg-config libssl-dev libunbound-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev rapidjson-dev libreadline-dev libcrypto++-dev libssl-dev
+sudo apt-get install -y git cmake g++ pkg-config libssl-dev libunbound-dev libminiupnpc-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-locale-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libzmq3-dev libhidapi-dev libprotobuf-dev libusb-dev libxapian-dev rapidjson-dev libreadline-dev libcrypto++-dev libssl-dev libolm-dev/bullseye-backports nlohmann-json3-dev libevent-dev libcurl4-openssl-dev libspdlog-dev
 # Clone piac
 git clone https://codeberg.org/piac/piac.git && cd piac
 # Build external libraries
