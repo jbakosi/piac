@@ -32,4 +32,4 @@ pipeline:
 services:
   synapse:
     image:  jbakosi/piac-synapse
-    pull: true
+      #pull: true
