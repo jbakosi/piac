@@ -2,8 +2,13 @@ matrix:
   include:
     - BUILDTYPE: Release
       COMPILER: gnu
-    - BUILDTYPE: Debug
-      COMPILER: clang
+        #    - BUILDTYPE: Debug
+        #      COMPILER: clang
+
+services:
+  synapse:
+    image:  jbakosi/piac-synapse
+    #pull: true
 
 pipeline:
   build:
@@ -14,10 +19,6 @@ pipeline:
     when:
       matrix:
         COMPILER: gnu
-  services:
-    synapse:
-      image:  jbakosi/piac-synapse
-      #pull: true
 
   build-clang:
     image: jbakosi/piac-clang
