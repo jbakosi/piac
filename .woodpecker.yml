@@ -5,6 +5,11 @@ matrix:
     - BUILDTYPE: Debug
       COMPILER: clang
 
+services:
+  synapse:
+    image:  jbakosi/piac-synapse
+    #pull: true
+
 pipeline:
   build:
     image: jbakosi/piac-gnu
@@ -28,8 +33,3 @@ pipeline:
     image: jbakosi/piac-${COMPILER}
     commands:
       - cd build && ctest -j$(grep -c processor /proc/cpuinfo) --output-on-failure -L matrix -V
-
-services:
-  synapse:
-    image:  jbakosi/piac-synapse
-      #pull: true
