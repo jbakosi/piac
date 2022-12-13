@@ -1,14 +1,14 @@
+services:
+  synapse:
+    image: jbakosi/piac-synapse
+    #pull: true
+
 matrix:
   include:
     - BUILDTYPE: Release
       COMPILER: gnu
-        #    - BUILDTYPE: Debug
-        #      COMPILER: clang
-
-services:
-  synapse:
-    image:  jbakosi/piac-synapse
-    #pull: true
+   - BUILDTYPE: Debug
+     COMPILER: clang
 
 pipeline:
   build:
