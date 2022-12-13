@@ -15,8 +15,7 @@
 #                     LABELS "matrix")
 
 file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.matrix-login" _in)
-add_test(NAME cli_matrix_login COMMAND sh -c
-  "$<TARGET_FILE:${CLI_EXECUTABLE}> --log-file ${CLI_EXECUTABLE}.matrix-login.log < ${_in}")
+add_test(NAME cli_matrix_login COMMAND sh -c "$<TARGET_FILE:${CLI_EXECUTABLE}> --log-file ${CMAKE_CURRENT_BINARY_DIR}/${CLI_EXECUTABLE}.matrix-login.log < ${_in}")
 set_tests_properties(cli_matrix_login PROPERTIES
   PASS_REGULAR_EXPRESSION "Connecting to matrix server as @alice:synapse"
   LABELS "matrix")
