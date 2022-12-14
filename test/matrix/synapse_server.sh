@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This is used to spin up a synapse matrix server for local (i.e., non-CI)
+# testing. Usage: synapse_server.sh <start/stop>.
+
 die () { echo >&2 "$@"; exit 1; }
 [ "$#" -eq 1 ] || die "Exactly 1 argument required: start/stop"
 

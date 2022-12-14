@@ -1,3 +1,10 @@
+# vim: filetype=dockerfile:
+#
+# Generate synapse matrix server service docker image for CI
+# See also .woodpecker.yml
+#
+# Usage:
+#
 # docker build -f Dockerfile -t piac-synapse .
 # docker-squash --cleanup piac-synapse -t jbakosi/piac-synapse
 # docker push jbakosi/piac-synapse
