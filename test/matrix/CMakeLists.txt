@@ -1,24 +1,30 @@
 # configure matrix tests
 
-## configure synapse target for matrix tests
-#find_program(DOCKER docker REQUIRED)
-#find_program(PERL perl REQUIRED)
-#
-#softlink( "${CMAKE_CURRENT_SOURCE_DIR}/adjust-config.sh"
-#          "${CMAKE_CURRENT_BINARY_DIR}" )
-#
-## start matrix server in background, run cli tests, kill daemon
-#add_test(NAME synapse_server_start
-#         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/synapse_server.sh start)
-#set_tests_properties(synapse_server_start PROPERTIES
-#                     PASS_REGULAR_EXPRESSION "Success!"
-#                     LABELS "matrix")
+if (NOT DEFINED ENV{CI})
+  # configure synapse target for matrix tests
+  find_program(DOCKER docker REQUIRED)
+  find_program(PERL perl REQUIRED)
+  softlink( "${CMAKE_CURRENT_SOURCE_DIR}/adjust-config.sh"
+            "${CMAKE_CURRENT_BINARY_DIR}" )
+  # start matrix server in background, run cli tests, kill daemon
+  add_test(NAME synapse_server_start
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/synapse_server.sh start)
+  set_tests_properties(synapse_server_start PROPERTIES
+                       PASS_REGULAR_EXPRESSION "Success!"
+                       LABELS "matrix")
+  set(SYNAPSE_SERVER_HOSTNAME "localhost")
+else()
+  set(SYNAPSE_SERVER_HOSTNAME "synapse")
+endif()
 
-file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cli.matrix-login" _in)
+configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/cli.matrix-login"
+                "${CMAKE_CURRENT_BINARY_DIR}/cli.matrix-login" )
+
+file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/cli.matrix-login" _in)
 add_test(NAME cli_matrix_login COMMAND sh -c
   "$<TARGET_FILE:${CLI_EXECUTABLE}> --log-file ${CLI_EXECUTABLE}.matrix-login.log < ${_in}")
 set_tests_properties(cli_matrix_login PROPERTIES
-  PASS_REGULAR_EXPRESSION "Connecting to matrix server as @alice:synapse"
+  PASS_REGULAR_EXPRESSION "Connecting to matrix server as @alice:${SYNAPSE_SERVER_HOSTNAME}"
   LABELS "matrix")
 
 add_test(NAME cli_matrix_login_grep COMMAND ${GREP} "recv parsed_messages"
@@ -26,11 +32,12 @@ add_test(NAME cli_matrix_login_grep COMMAND ${GREP} "recv parsed_messages"
 set_tests_properties(cli_matrix_login_grep PROPERTIES
                      DEPENDS cli_matrix_login LABELS "matrix")
 
-#add_test(NAME synapse_server_stop
-#         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/synapse_server.sh stop)
-#set_tests_properties(synapse_server_stop PROPERTIES LABELS "matrix")
-#
-#set_property(TEST synapse_server_start PROPERTY FIXTURES_SETUP synapse)
-#set_tests_properties(cli_matrix_login cli_matrix_login_grep
-#                     PROPERTIES FIXTURES_REQUIRED synapse)
-#set_property(TEST synapse_server_stop PROPERTY FIXTURES_CLEANUP synapse)
+if (NOT DEFINED ENV{CI})
+  add_test(NAME synapse_server_stop
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/synapse_server.sh stop)
+  set_tests_properties(synapse_server_stop PROPERTIES LABELS "matrix")
+  set_property(TEST synapse_server_start PROPERTY FIXTURES_SETUP synapse)
+  set_tests_properties(cli_matrix_login cli_matrix_login_grep
+                       PROPERTIES FIXTURES_REQUIRED synapse)
+  set_property(TEST synapse_server_stop PROPERTY FIXTURES_CLEANUP synapse)
+endif()
