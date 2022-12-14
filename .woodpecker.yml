@@ -1,3 +1,10 @@
+matrix:
+  include:
+    - BUILDTYPE: Release
+      COMPILER: gnu
+    #- BUILDTYPE: Debug
+    #  COMPILER: clang
+
 services:
   synapse:
     image: jbakosi/piac-synapse
@@ -5,13 +12,6 @@ services:
     when:
       matrix:
         COMPILER: gnu
-
-matrix:
-  include:
-    - BUILDTYPE: Release
-      COMPILER: gnu
-    - BUILDTYPE: Debug
-      COMPILER: clang
 
 pipeline:
   build:
