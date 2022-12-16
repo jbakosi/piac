@@ -52,6 +52,7 @@ Here is a todo list in no particular order:
 - [ ] allow user to buy something
 - [ ] allow user to track order status
 - [ ] allow user to create whishlist
+- [ ] refactor to facilitate easy translation to other languages of both cli and daemon
 - [ ] explore escrow
 - [ ] explore/add reputation (automatic after successful buy/sell and/or by other users)
 - [ ] explore product rating
