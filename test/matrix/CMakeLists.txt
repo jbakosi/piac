@@ -18,8 +18,6 @@ else()
 endif()
 
 
-set(GREP cat)
-
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/cli.matrix-login"
                 "${CMAKE_CURRENT_BINARY_DIR}/cli.matrix-login" )
 
