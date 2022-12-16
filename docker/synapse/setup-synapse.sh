@@ -8,7 +8,7 @@ apt-get update && apt-get -y install --no-install-recommends runit openssl
 
 mkdir -p /data
 
-SYNAPSE_SERVER_NAME=localhost SYNAPSE_REPORT_STATS=no /start.py generate
+SYNAPSE_SERVER_NAME=synapse SYNAPSE_REPORT_STATS=no /start.py generate
 
 # yes, the empty line is needed
 cat <<EOF >> /data/homeserver.yaml
