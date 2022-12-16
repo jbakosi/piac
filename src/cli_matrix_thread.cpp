@@ -26,6 +26,7 @@
 #include "mtxclient/crypto/client.hpp"
 #include "mtx/responses/sync.hpp"
 #include "mtx/responses/common.hpp"
+#include "mtx/responses/create_room.hpp"
 #include "mtx/events.hpp"
 #include "mtx/events/encrypted.hpp"
 
@@ -37,8 +38,6 @@
 #include "logging_util.hpp"
 #include "string_util.hpp"
 
-#define SYNC_TIMEOUT 5000   //  msecs, (> 1000!)
-
 constexpr auto OLM_ALGO = "m.olm.v1.curve25519-aes-sha2";
 static std::shared_ptr< mtx::http::Client> g_mtxclient = nullptr;
 static std::shared_ptr< mtx::crypto::OlmClient> g_olmclient = nullptr;
@@ -47,6 +46,7 @@ static std::string g_mtx_session_db_filename;
 static std::string g_mtx_db_storage_key;
 static std::vector< zmqpp::socket > g_msg_mtx;
 
+uint16_t piac::g_matrix_sync_timeout = 10'000;     // milliseconds
 bool piac::g_matrix_connected = false;
 bool piac::g_matrix_shutdown = false;
 zmqpp::context piac::g_ctx_msg;
@@ -355,7 +355,7 @@ print_errors( mtx::http::RequestErr err )
 // *****************************************************************************
 {
   if (err->status_code)
-    MERROR("status code: " << static_cast<uint16_t>(err->status_code));
+    MERROR( "status code: " << static_cast<uint16_t>(err->status_code));
   if (not err->matrix_error.error.empty() )
     MERROR( "error msg: " << err->matrix_error.error );
   if (err->error_code)
@@ -779,6 +779,43 @@ create_outbound_megolm_session( const std::string& room_id,
 #endif
 
 static void
+invite_room( const std::string& src_user,
+             const std::string& target_user,
+             const std::string& ad )
+// *****************************************************************************
+//  Invite user to a room
+// *****************************************************************************
+{
+  MINFO( src_user << " invites " << target_user << " to room" );
+
+  mtx::requests::CreateRoom req;
+  req.name   = "Conversation between " + src_user + " and " + target_user;
+  req.topic  = ad;
+  req.invite = { '@' + target_user + ':' + g_mtxclient->server() };
+  g_mtxclient->create_room( req,
+    [&](const mtx::responses::CreateRoom& res, mtx::http::RequestErr err) {
+        print_errors( err );
+        auto room_id = res.room_id.to_string();
+        MINFO( src_user << " created room id " << room_id );
+        g_mtxclient->invite_user( room_id,
+          '@' + target_user + ':' + g_mtxclient->server(),
+          [room_id](const mtx::responses::Empty&, mtx::http::RequestErr) {} );
+    });
+}
+
+void
+piac::matrix_message( const std::string& src_user,
+                      const std::string& target_user,
+                      const std::string& msg )
+// *****************************************************************************
+//  Send a message to a user
+// *****************************************************************************
+{
+  MINFO( src_user << " messages " << target_user );
+  invite_room( src_user, target_user, msg );
+}
+
+static void
 send_encrypted_reply( const std::string& room_id, const std::string& reply_msg )
 // *****************************************************************************
 // *****************************************************************************
@@ -811,7 +848,7 @@ parse_messages( const mtx::responses::Sync& res )
   for (const auto& room : res.rooms.invite) {
     auto room_id = room.first;
 
-    MDEBUG( "joining room " + room_id );
+    MINFO( "joining room " + room_id );
     g_mtxclient->join_room( room_id,
       [room_id](const mtx::responses::RoomId&, mtx::http::RequestErr e) {
         if (e) {
@@ -933,7 +970,7 @@ sync_handler( const mtx::responses::Sync& res, mtx::http::RequestErr err )
   if (piac::g_matrix_shutdown) return;
 
   parse_messages( res );
-  opts.timeout = SYNC_TIMEOUT;
+  opts.timeout = piac::g_matrix_sync_timeout;
   opts.since = res.next_batch;
   g_mtxclient->set_next_batch_token( res.next_batch );
   g_mtxclient->sync( opts, &sync_handler );
@@ -982,7 +1019,7 @@ initial_sync_handler( const mtx::responses::Sync& res,
   }
 
   opts.since = res.next_batch;
-  opts.timeout = SYNC_TIMEOUT;
+  opts.timeout = piac::g_matrix_sync_timeout;
   g_mtxclient->set_next_batch_token( res.next_batch );
   g_mtxclient->sync( opts, &sync_handler );
 }

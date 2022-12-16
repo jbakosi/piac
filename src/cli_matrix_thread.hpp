@@ -29,9 +29,15 @@
 
 namespace piac {
 
+extern uint16_t g_matrix_sync_timeout;
 extern bool g_matrix_connected;
 extern bool g_matrix_shutdown;
 extern zmqpp::context g_ctx_msg;
+
+//! Send a message to a user
+void matrix_message( const std::string& src_user,
+                     const std::string& target_user,
+                     const std::string& msg );
 
 //! Entry point to thread to communicate with a matrix server
 void matrix_thread( const std::string& server,

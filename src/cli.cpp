@@ -150,8 +150,11 @@ usage( const std::string& logfile )
          "         Load server public key from file. Neet to also set "
                   "--rpc-secure. If given,\n"
          "         --rpc-server-public-key takes precedence.\n\n"
+         "  --matrix-sync-timeout\n"
+         "         Timeout in milliseconds for matrix sync calls. The default "
+                 "is " + std::to_string(piac::g_matrix_sync_timeout) + ".\n\n"
          "  --version\n"
-         "         Show version information\n\n";
+         "         Show version information.\n\n";
 }
 
 static void
@@ -213,6 +216,7 @@ main( int argc, char **argv )
   const int ARG_RPC_CLIENT_SECRET_KEY_FILE = 1007;
   const int ARG_RPC_SERVER_PUBLIC_KEY      = 1008;
   const int ARG_RPC_SERVER_PUBLIC_KEY_FILE = 1009;
+  const int ARG_MATRIX_SYNC_TIMEOUT        = 1010;
   static struct option long_options[] =
     {
       { "help", no_argument, nullptr, ARG_HELP },
@@ -229,6 +233,8 @@ main( int argc, char **argv )
         ARG_RPC_SERVER_PUBLIC_KEY},
       { "rpc-server-public-key-file",required_argument, nullptr,
         ARG_RPC_SERVER_PUBLIC_KEY_FILE},
+      { "matrix-sync-timeout",required_argument, nullptr,
+        ARG_MATRIX_SYNC_TIMEOUT},
       { "version", no_argument, nullptr, ARG_VERSION },
       { nullptr, 0, nullptr, 0 }
     };
@@ -286,6 +292,13 @@ main( int argc, char **argv )
 
       case ARG_RPC_SERVER_PUBLIC_KEY_FILE: {
         rpc_server_public_key_file = optarg;
+        break;
+      }
+
+      case ARG_MATRIX_SYNC_TIMEOUT: {
+        std::stringstream s;
+        s << optarg;
+        s >> piac::g_matrix_sync_timeout;
         break;
       }
 
@@ -498,7 +511,18 @@ main( int argc, char **argv )
 
     } else if (buf[0]=='m' && buf[1]=='s' && buf[2]=='g') {
 
-      //piac::matrix_message( matrix_user, buf );
+      if (not g_wallet) {
+        std::cerr << "Need active user id (wallet). See 'new' or 'user'.\n";
+      }
+      std::string b( buf );
+      auto t = piac::tokenize( b );
+      if (t.size() == 3) {
+        auto target_user = t[1];
+        auto msg = t[2];
+        piac::matrix_message( matrix_user, target_user, msg );
+      } else {
+        std::cerr << "Need exactly 3 tokens.\n";
+      }
 
     } else if (buf[0]=='m' && buf[1]=='a' && buf[2]=='t' && buf[3]=='r' &&
                buf[4]=='i' && buf[5]=='x') {
