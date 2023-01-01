@@ -1075,7 +1075,7 @@ piac::matrix_thread( const std::string& server,
                      const std::string& db_key )
 // *****************************************************************************
 //  Entry point to thread to communicate with a matrix server
-//! \param[in] server Matrix hostname to connect to as <host>[:port]
+//! \param[in] server Matrix hostname to connect to as \<host\>[:port]
 //! \param[in] username Username to use
 //! \param[in] password Password to use
 //! \param[in] db_key Database key to use to encrypt session db on disk
