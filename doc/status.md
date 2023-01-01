@@ -57,6 +57,7 @@ Here is a todo list in no particular order:
 - [ ] explore/add reputation (automatic after successful buy/sell and/or by other users)
 - [ ] explore product rating
 - [ ] explore encrypting db at rest
+- [ ] respect `NO_COLOR` env var, see https://github.com/monero-project/monero/issues/8688
 - [ ] add valgrind tests
 - [ ] add detailed contributing.md
 - [ ] describe trust model
