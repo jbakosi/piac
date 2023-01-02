@@ -58,6 +58,8 @@ Here is a todo list in no particular order:
 - [ ] explore product rating
 - [ ] explore encrypting db at rest
 - [ ] respect `NO_COLOR` env var, see https://github.com/monero-project/monero/issues/8688
+- [ ] write communication protocol specification document for daemon
+- [ ] add JSON API to daemon (e.g., https://github.com/uskr/jsonrpc-lean)
 - [ ] add valgrind tests
 - [ ] add detailed contributing.md
 - [ ] describe trust model
