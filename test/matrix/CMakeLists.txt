@@ -45,7 +45,7 @@ set_tests_properties(cli_matrix_invite_room PROPERTIES
   DEPENDS cli_matrix_login
   LABELS "matrix")
 
-add_test(NAME cli_matrix_invite_room_grep COMMAND ${GREP} "@alice:${SYNAPSE_SERVER_HOSTNAME} invites @bob:${SYNAPSE_SERVER_HOSTNAME} to room"
+add_test(NAME cli_matrix_invite_room_grep COMMAND ${GREP} -E "@alice:${SYNAPSE_SERVER_HOSTNAME} invites @bob:${SYNAPSE_SERVER_HOSTNAME} to room\|room between @alice:${SYNAPSE_SERVER_HOSTNAME} and @bob:${SYNAPSE_SERVER_HOSTNAME} already exists"
          ${CMAKE_CURRENT_BINARY_DIR}/${CLI_EXECUTABLE}.invite_room.log)
 set_tests_properties(cli_matrix_invite_room_grep PROPERTIES
                      DEPENDS cli_matrix_invite_room
