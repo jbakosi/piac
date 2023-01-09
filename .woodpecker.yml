@@ -32,4 +32,4 @@ pipeline:
   test:
     image: jbakosi/piac-${COMPILER}
     commands:
-      - cd build && ctest -j$(grep -c processor /proc/cpuinfo) --output-on-failure -L matrix -V
+      - cd build && ctest -j$(grep -c processor /proc/cpuinfo) --output-on-failure
