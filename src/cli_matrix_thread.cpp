@@ -1126,8 +1126,8 @@ piac::matrix_thread( const std::string& server,
     g_olmclient->load(
       nlohmann::json::parse(db_data).at("account").get<std::string>(),
       g_mtx_db_storage_key );
+    g_storage.load();
   }
-  g_storage.load();
 
   // create socket to forward matrix messages to
   g_msg_mtx.emplace_back( piac::g_ctx_msg, zmqpp::socket_type::pair );
