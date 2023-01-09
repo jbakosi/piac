@@ -1115,6 +1115,8 @@ piac::matrix_thread( const std::string& server,
   std::string db_base_filename = "piac-matrix-@" + username + ':' + server;
   g_mtx_account_db_filename = db_base_filename + ".account.json";
   g_mtx_session_db_filename = db_base_filename + ".session.json";
+  MINFO( "account db filename: " << g_mtx_account_db_filename );
+  MINFO( "session db filename: " << g_mtx_session_db_filename );
   g_mtx_db_storage_key = db_key;
 
   std::ifstream db( g_mtx_account_db_filename );
