@@ -13,7 +13,7 @@ services:
 pipeline:
   build:
     image: jbakosi/piac-gnu
-    #pull: true
+    pull: true
     commands:
      - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DTPL_DIR=/piac/external/install/${COMPILER}-x86_64 .. && make -sj$(grep -c processor /proc/cpuinfo)
     when:
@@ -22,7 +22,7 @@ pipeline:
 
   build-clang:
     image: jbakosi/piac-clang
-    #pull: true
+    pull: true
     commands:
      - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=${BUILDTYPE} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DTPL_DIR=/piac/external/install/${COMPILER}-x86_64 .. && make -sj$(grep -c processor /proc/cpuinfo)
     when:
