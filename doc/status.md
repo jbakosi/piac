@@ -42,7 +42,7 @@ Here is a todo list in no particular order:
 - [ ] allow connecting within I2P via i2pd (both daemon-cli and p2p)
 - [ ] add p2p traffic encryption and authentication
 - [ ] implement more sophisticated p2p commmunication based on white/gray lists
-- [ ] add messaging between users via matrix (WIP, login, create/join room work, tested)
+- [ ] add messaging between users via matrix (WIP, login, invite/join room work, tested)
 - [ ] allow user to save other users in addressbook (matrixuser + monero address)
 - [ ] add user's bio (e.g., external contact info) and make it searchable
 - [x] allow connecting to local monero node
