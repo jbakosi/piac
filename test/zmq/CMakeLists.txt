@@ -176,7 +176,7 @@ set_tests_properties(kill_pirate_server_zmq PROPERTIES
                      PASS_REGULAR_EXPRESSION "Killing PID|No such process"
                      FAIL_REGULAR_EXPRESSION "Cannot open file")
 add_test(NAME pirate_zmq_clean_log COMMAND
-  ${CMAKE_COMMAND} -E remove pirate_server.log piac-cli-pirate.log)
+  ${CMAKE_COMMAND} -E rm pirate_server.log piac-cli-pirate.log)
 set_tests_properties(pirate_zmq_clean_log PROPERTIES
   DEPENDS "kill_pirate_server_zmq;pirate_server_zmq_grep;pirate_cli_zmq_grep"
   LABELS "zmq;pirate")
