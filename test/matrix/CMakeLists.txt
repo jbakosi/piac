@@ -69,10 +69,10 @@ set_tests_properties(cli_matrix_join_room_grep PROPERTIES
 
 
 add_test(NAME matrix_client_clean_sessions COMMAND
-  ${CMAKE_COMMAND} -E remove piac-matrix-@alice:localhost:8008.account.json
-                             piac-matrix-@alice:localhost:8008.session.json
-                             piac-matrix-@bob:localhost:8008.account.json
-                             piac-matrix-@bob:localhost:8008.session.json)
+  ${CMAKE_COMMAND} -E remove piac-matrix-@alice:${SYNAPSE_SERVER_HOSTNAME}:8008.account.json
+                             piac-matrix-@alice:${SYNAPSE_SERVER_HOSTNAME}:8008.session.json
+                             piac-matrix-@bob:${SYNAPSE_SERVER_HOSTNAME}:8008.account.json
+                             piac-matrix-@bob:${SYNAPSE_SERVER_HOSTNAME}:8008.session.json)
 set_tests_properties(matrix_client_clean_sessions PROPERTIES
   DEPENDS "cli_matrix_login;cli_matrix_invite_room_grep;cli_matrix_join_room_grep"
   LABELS matrix)
