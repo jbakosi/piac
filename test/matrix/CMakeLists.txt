@@ -52,6 +52,16 @@ set_tests_properties(cli_matrix_invite_room_grep PROPERTIES
                      LABELS "matrix")
 
 
+
+add_test(NAME list_log
+         COMMAND cat ${CMAKE_CURRENT_BINARY_DIR}/${CLI_EXECUTABLE}.invite_room.log)
+set_tests_properties(list_log PROPERTIES
+                     DEPENDS cli_matrix_invite_room_grep
+                     LABELS "matrix")
+
+
+
+
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/cli.join_room"
                 "${CMAKE_CURRENT_BINARY_DIR}/cli.join_room" )
 
@@ -74,7 +84,7 @@ add_test(NAME matrix_client_clean_sessions COMMAND
                          piac-matrix-@bob:${SYNAPSE_SERVER_HOSTNAME}:8008.account.json
                          piac-matrix-@bob:${SYNAPSE_SERVER_HOSTNAME}:8008.session.json)
 set_tests_properties(matrix_client_clean_sessions PROPERTIES
-  DEPENDS "cli_matrix_login;cli_matrix_invite_room_grep;cli_matrix_join_room_grep"
+  DEPENDS "cli_matrix_login;cli_matrix_invite_room_grep;list_log;cli_matrix_join_room_grep"
   LABELS matrix)
 
 if (NOT DEFINED ENV{CI})
@@ -84,7 +94,7 @@ if (NOT DEFINED ENV{CI})
 
   set_property(TEST synapse_server_start PROPERTY FIXTURES_SETUP synapse)
   set_tests_properties(cli_matrix_login cli_matrix_login_grep
-                       cli_matrix_invite_room cli_matrix_invite_room_grep
+                       cli_matrix_invite_room cli_matrix_invite_room_grep list_log
                        cli_matrix_join_room cli_matrix_join_room_grep
                        PROPERTIES FIXTURES_REQUIRED synapse)
   set_property(TEST synapse_server_stop matrix_client_clean_sessions
