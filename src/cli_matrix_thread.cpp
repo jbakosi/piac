@@ -273,8 +273,13 @@ struct Storage {
 
     nlohmann::json obj = nlohmann::json::parse( db_data );
 
-    device_id = obj.at( "device_id" ).get< string >();
-    access_token = obj.at( "access_token" ).get< string >();
+    try {
+      device_id = obj.at( "device_id" ).get< string >();
+      access_token = obj.at( "access_token" ).get< string >();
+    } catch ( const nlohmann::json::exception& e ) {
+      MWARNING( "json parsing error: " << e.what() );
+    }
+
     devices = obj.at( "devices" ).get< map< string, vector< string > > >();
     device_keys = obj.at( "device_keys" ).get< map< string, DevKeys > >();
     encrypted_rooms = obj.at( "encrypted_rooms" ).get< map< string, bool> >();
@@ -1117,8 +1122,6 @@ piac::matrix_thread( const std::string& server,
   g_mtx_session_db_filename = db_base_filename + ".session.json";
   MINFO( "account db filename: " << g_mtx_account_db_filename );
   MINFO( "session db filename: " << g_mtx_session_db_filename );
-  std::cout << "account db filename: " << g_mtx_account_db_filename << '\n';
-  std::cout << "session db filename: " << g_mtx_session_db_filename << '\n';
   g_mtx_db_storage_key = db_key;
 
   std::ifstream db( g_mtx_account_db_filename );
