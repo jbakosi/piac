@@ -41,6 +41,7 @@
 constexpr auto OLM_ALGO = "m.olm.v1.curve25519-aes-sha2";
 static std::shared_ptr< mtx::http::Client> g_mtxclient = nullptr;
 static std::shared_ptr< mtx::crypto::OlmClient> g_olmclient = nullptr;
+static std::string g_matrix_user;
 static std::string g_mtx_account_db_filename;
 static std::string g_mtx_session_db_filename;
 static std::string g_mtx_db_storage_key;
@@ -175,18 +176,28 @@ struct Storage {
   using InboundGroupSessionPtr = mtx::crypto::InboundGroupSessionPtr;
   using OutboundGroupSessionPtr = mtx::crypto::OutboundGroupSessionPtr;
 
+  //! This device id
+  std::string device_id;
+  //! Access token
+  std::string access_token;
   //! Storage for the user_id -> list of devices mapping
   std::map< std::string, std::vector< std::string > > devices;
   //! Storage for the identity key for a device.
   std::map< std::string, DevKeys > device_keys;
   //! Flag that indicate if a specific room has encryption enabled.
   std::map< std::string, bool > encrypted_rooms;
-
   //! Keep track of members per room.
   std::map< std::string, std::map< std::string, bool > > members;
 
   void add_member( const std::string& room_id, const std::string& user_id ) {
-    members[room_id][user_id] = true;
+    members[ room_id ][ user_id ] = true;
+  }
+
+  std::string in_room( const std::string& usr1, const std::string& usr2 ) {
+    for (const auto& [room_id, users] : members)
+      if (users.find(usr1) != end(users) && users.find(usr2) != end(users))
+        return room_id;
+    return {};
   }
 
   //! Mapping from curve25519 to session
@@ -262,6 +273,8 @@ struct Storage {
 
     nlohmann::json obj = nlohmann::json::parse( db_data );
 
+    device_id = obj.at( "device_id" ).get< string >();
+    access_token = obj.at( "access_token" ).get< string >();
     devices = obj.at( "devices" ).get< map< string, vector< string > > >();
     device_keys = obj.at( "device_keys" ).get< map< string, DevKeys > >();
     encrypted_rooms = obj.at( "encrypted_rooms" ).get< map< string, bool> >();
@@ -409,9 +422,9 @@ decrypt_olm_message( const OlmMessage& olm_msg )
           std::string room_id =
             plaintext.at( "content" ).at( "room_id" ).get< std::string >();
           std::string session_id =
-            plaintext.at( "content ").at( "session_id" ).get <std::string >();
+            plaintext.at( "content").at( "session_id" ).get< std::string >();
           std::string session_key =
-            plaintext.at( "content" ).at( "session_key" ).get <std::string >();
+            plaintext.at( "content" ).at( "session_key" ).get< std::string >();
 
           if (g_storage.inbound_group_exists( room_id, session_id,
                                               olm_msg.sender_key ))
@@ -539,9 +552,6 @@ save_device_keys( const mtx::responses::QueryKeys& res )
   for (const auto &entry : res.device_keys) {
     const auto user_id = entry.first;
 
-    if (not exists( g_storage.devices, user_id ))
-      MINFO( "keys for " << user_id );
-
     std::vector< std::string > device_list;
     for (const auto &device : entry.second) {
       const auto key_struct = device.second;
@@ -554,7 +564,8 @@ save_device_keys( const mtx::responses::QueryKeys& res )
       const auto key = key_struct.keys.at( index );
 
       if (!exists(g_storage.device_keys, device_id)) {
-        MINFO( "save device id => key: " << device_id << " => " << key );
+        MINFO( "saved user " << user_id << "'s device id => key: " <<
+               device_id << " => " << key );
         g_storage.device_keys[ device_id ] =
           { key_struct.keys.at("ed25519:" + device_id),
             key_struct.keys.at("curve25519:" + device_id) };
@@ -563,9 +574,7 @@ save_device_keys( const mtx::responses::QueryKeys& res )
       device_list.push_back( device_id );
     }
 
-    if (not exists( g_storage.devices, user_id )) {
-      g_storage.devices[ user_id ] = device_list;
-    }
+    g_storage.devices[ user_id ] = device_list;
   }
 }
 
@@ -655,7 +664,7 @@ send_group_message( OlmOutboundGroupSession* session,
 
 static void
 create_outbound_megolm_session( const std::string& room_id,
-                                const std::string& reply_msg )
+                                const std::string& msg )
 // *****************************************************************************
 // *****************************************************************************
 {
@@ -685,7 +694,7 @@ create_outbound_megolm_session( const std::string& room_id,
     // TODO: Figure out for which devices we don't have olm sessions.
     for (const auto &dev : devices) {
       // TODO: check if we have downloaded the keys
-      const auto device_keys = g_storage.device_keys[ dev ];
+      const auto& device_keys = g_storage.device_keys[ dev ];
 
       auto to_device_cb = [](mtx::http::RequestErr err) {
         if (err) {
@@ -762,12 +771,8 @@ create_outbound_megolm_session( const std::string& room_id,
     }
   }
 
-  MINFO( "waiting to send sendToDevice messages" );
-  std::this_thread::sleep_for( std::chrono::milliseconds(2000) );
-  MINFO( "sending encrypted group message" );
-
   // TODO: This should be done after all sendToDevice messages have been sent.
-  send_group_message( outbound_session.get(), session_id, room_id, reply_msg );
+  send_group_message( outbound_session.get(), session_id, room_id, msg );
 
   // TODO: save message index also.
   g_storage.set_outbound_group_session(
@@ -778,61 +783,58 @@ create_outbound_megolm_session( const std::string& room_id,
   #pragma clang diagnostic pop
 #endif
 
-static void
-invite_room( const std::string& src_user,
-             const std::string& target_user,
-             const std::string& ad )
+static std::string
+invite_room( const std::string& usr,
+             const std::string& ad,
+             const std::string& msg )
 // *****************************************************************************
 //  Invite user to a room
 // *****************************************************************************
 {
-  MINFO( src_user << " invites " << target_user << " to room" );
+  MINFO( g_matrix_user << " invites " << usr << " to room" );
 
   mtx::requests::CreateRoom req;
-  req.name   = "Conversation between " + src_user + " and " + target_user;
-  req.topic  = ad;
-  req.invite = { '@' + target_user + ':' + g_mtxclient->server() };
+  req.name = "Conversation between " + g_matrix_user + " and " + usr;
+  req.topic = ad;
+  req.invite = { usr };
+  std::string room_id;
   g_mtxclient->create_room( req,
     [&](const mtx::responses::CreateRoom& res, mtx::http::RequestErr err) {
         print_errors( err );
-        auto room_id = res.room_id.to_string();
-        MINFO( src_user << " created room id " << room_id );
-        g_mtxclient->invite_user( room_id,
-          '@' + target_user + ':' + g_mtxclient->server(),
-          [room_id](const mtx::responses::Empty&, mtx::http::RequestErr) {} );
+        room_id = res.room_id.to_string();
+        MINFO( g_matrix_user << " created room id " << room_id );
+        g_mtxclient->invite_user( room_id, usr,
+          [](const mtx::responses::Empty&, mtx::http::RequestErr) {} );
+        create_outbound_megolm_session( room_id, msg );
     });
+  return room_id;
 }
 
 void
-piac::matrix_message( const std::string& src_user,
-                      const std::string& target_user,
-                      const std::string& msg )
+piac::matrix_message( std::string usr, std::string ad, std::string msg )
 // *****************************************************************************
 //  Send a message to a user
 // *****************************************************************************
 {
-  MINFO( src_user << " messages " << target_user );
-  invite_room( src_user, target_user, msg );
-}
+  MINFO( g_matrix_user << " messages " << usr );
 
-static void
-send_encrypted_reply( const std::string& room_id, const std::string& reply_msg )
-// *****************************************************************************
-// *****************************************************************************
-{
-  MINFO( "sending encrypted reply" );
+  // create new room between users if it does not yet exist
+  auto room_id = g_storage.in_room( g_matrix_user, usr );
+  if (room_id.empty()) {
 
-  // Create a megolm session if it doesn't already exist
-  if (g_storage.outbound_group_exists( room_id )) {
+    MINFO( "room between " << g_matrix_user << " and " << usr <<
+           " does not yet exist" );
+    room_id = invite_room( usr, ad, msg );
+
+  } else {
+
+    MINFO( "room between " << g_matrix_user << " and " << usr <<
+           " already exists" );
     auto session_obj = g_storage.get_outbound_group_session( room_id );
     send_group_message( session_obj.session,
                         session_obj.data.session_id,
                         room_id,
-                        reply_msg );
-
-  } else {
-    MINFO( "creating new megolm outbound session" );
-    create_outbound_megolm_session( room_id, reply_msg );
+                        msg );
   }
 }
 
@@ -847,7 +849,6 @@ parse_messages( const mtx::responses::Sync& res )
 
   for (const auto& room : res.rooms.invite) {
     auto room_id = room.first;
-
     MINFO( "joining room " + room_id );
     g_mtxclient->join_room( room_id,
       [room_id](const mtx::responses::RoomId&, mtx::http::RequestErr e) {
@@ -856,7 +857,7 @@ parse_messages( const mtx::responses::Sync& res )
           MERROR( "failed to join room " << room_id );
           return;
         }
-    } );
+      });
   }
 
   // Check if we have any new m.room_key messages
@@ -874,8 +875,7 @@ parse_messages( const mtx::responses::Sync& res )
   }
 
   for (const auto &room : res.rooms.join) {
-
-    const std::string room_id = room.first;
+    const auto room_id = room.first;
 
     for (const auto &e : room.second.state.events) {
       if (is_room_encryption( e )) {
@@ -926,19 +926,12 @@ parse_messages( const mtx::responses::Sync& res )
           MDEBUG( "decrypted data: " << body );
           MDEBUG( "decrypted message index: " << r.message_index );
 
-          if (msg.sender != g_mtxclient->user_id().to_string()) {
-            // Send a reply back to the sender
-            std::string reply_txt( msg.sender + ": you said '" + body + "'");
-            send_encrypted_reply( room_id, reply_txt );
-          }
-
         } else {
           MWARNING( "no megolm session found to decrypt the event" );
         }
 
       }
     }
-
   }
 
   // tell the message thread that we have just parsed messages
@@ -1043,8 +1036,17 @@ login_cb( const mtx::responses::Login&, mtx::http::RequestErr error )
     return;
   }
 
+  if (not g_storage.device_id.empty() && not g_storage.access_token.empty()) {
+    g_mtxclient->set_device_id( g_storage.device_id );
+    g_mtxclient->set_access_token( g_storage.access_token );
+  } else {
+    g_storage.device_id = g_mtxclient->device_id();
+    g_storage.access_token = g_mtxclient->access_token();
+  }
+
   MDEBUG( "user id: " + g_mtxclient->user_id().to_string() );
   MDEBUG( "device id: " + g_mtxclient->device_id() );
+  MDEBUG( "access token: " + g_mtxclient->access_token() );
   MDEBUG( "ed25519: " + g_olmclient->identity_keys().ed25519 );
   MDEBUG( "curve25519: " + g_olmclient->identity_keys().curve25519 );
 
@@ -1105,6 +1107,7 @@ piac::matrix_thread( const std::string& server,
     g_mtxclient = std::make_shared< mtx::http::Client >( host, port );
   }
   MDEBUG( "will connect as @" << username << ':' << host << ':' << port );
+  g_matrix_user = '@' + username + ':' + host;
 
   g_mtxclient->verify_certificates( false );
   g_olmclient = std::make_shared< mtx::crypto::OlmClient >();

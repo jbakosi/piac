@@ -517,9 +517,9 @@ main( int argc, char **argv )
       std::string b( buf );
       auto t = piac::tokenize( b );
       if (t.size() == 3) {
-        auto target_user = t[1];
+        auto other_user = t[1];
         auto msg = t[2];
-        piac::matrix_message( matrix_user, target_user, msg );
+        piac::matrix_message( other_user, "ad", msg );
       } else {
         std::cerr << "Need exactly 3 tokens.\n";
       }
