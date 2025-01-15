@@ -1,7 +1,7 @@
 // *****************************************************************************
 /*!
   \file      src/crypto_util.hpp
-  \copyright 2022-2023 J. Bakosi,
+  \copyright 2022-2025 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac cryptography utilities
 */

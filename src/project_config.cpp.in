@@ -1,7 +1,7 @@
 // *****************************************************************************
 /*!
   \file      src/project_config.cpp.in
-  \copyright 2022-2023 J. Bakosi,
+  \copyright 2022-2025 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac project configuartion imported build system data from cmake
 */

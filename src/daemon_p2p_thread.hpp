@@ -1,7 +1,7 @@
 // *****************************************************************************
 /*!
   \file      src/daemon_p2p_thread.hpp
-  \copyright 2022-2023 J. Bakosi,
+  \copyright 2022-2025 J. Bakosi,
              All rights reserved. See the LICENSE file for details.
   \brief     Piac daemon peer-to-peer communication
 */
